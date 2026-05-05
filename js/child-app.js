@@ -213,7 +213,7 @@ document.addEventListener('firebase:ready', async () => {
       if (t.status === C.TASK_STATUS_AVAILABLE) {
         actionBtn = `<button class="btn btn--primary btn--sm" data-action="accept" data-id="${t.id}">接受任务</button>`;
       } else if (t.status === C.TASK_STATUS_COMPLETED) {
-        const mult = streak ? StreakManager.getTodayMultiplier(streak) : 1.0;
+        const mult = (t.type === 'daily' && streak) ? StreakManager.getTodayMultiplier(streak) : 1.0;
         const earned = Math.round(t.points * mult);
         actionBtn = `<button class="btn btn--success btn--sm glow-btn" data-action="claim" data-id="${t.id}">领取 +${earned}</button>`;
       }

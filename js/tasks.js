@@ -77,9 +77,12 @@ const TaskManager = (() => {
       throw new Error('任务尚未完成');
     }
 
-    // 计算积分（含连续打卡倍率，全天固定不变）
-    const streak = await Store.getStreak(uid);
-    const multiplier = StreakManager.getTodayMultiplier(streak);
+    // 计算积分（每日任务享受打卡倍率，限时任务为 1.0x）
+    let multiplier = 1.0;
+    if (task.type === C.TASK_TYPE_DAILY) {
+      const streak = await Store.getStreak(uid);
+      multiplier = StreakManager.getTodayMultiplier(streak);
+    }
     const earnedPoints = Math.round(task.points * multiplier);
 
     // 添加成果积分

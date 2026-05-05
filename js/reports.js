@@ -25,7 +25,9 @@ const ReportManager = (() => {
 
   function getLastWeekRange() {
     const d = new Date();
-    d.setDate(d.getDate() - 7);
+    const day = d.getDay();
+    const offset = day === 0 ? 6 : day - 1;
+    d.setDate(d.getDate() - offset - 7);
     return getWeekRange(d);
   }
 

@@ -21,21 +21,47 @@ auth.signInAnonymously().catch(err => {
   console.error('Firebase Auth 失败:', err);
 });
 
-// 共享 UID：所有设备使用同一个 ID，解决跨设备数据不一致问题
+// Auth 超时降级：15 秒内未完成则显示错误 UI
+let _authDone = false;
+const AUTH_TIMEOUT_MS = 15000;
+setTimeout(() => {
+  if (_authDone) return;
+  document.documentElement.innerHTML = `
+    <body style="margin:0;padding:0;background:#0a0e17;color:#e0e0e0;font-family:system-ui,sans-serif;
+      display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center">
+      <div>
+        <h2 style="color:#ff6b6b">无法连接到服务器</h2>
+        <p style="color:#8892b0;margin:8px 0 20px">请检查网络连接后刷新页面</p>
+        <button onclick="location.reload()" style="background:#00d4ff;color:#0a0e17;border:none;
+          padding:10px 28px;border-radius:6px;font-size:16px;cursor:pointer">重试</button>
+      </div>
+    </body>`;
+}, AUTH_TIMEOUT_MS);
+
+// 共享 UID：使用事务防止多设备同时写入的竞态条件
 auth.onAuthStateChanged(async user => {
   if (!user) return;
 
-  const cfgRef = db.collection('appConfig').doc('config');
-  const cfgSnap = await cfgRef.get();
-  let sharedUid;
+  try {
+    const cfgRef = db.collection('appConfig').doc('config');
 
-  if (cfgSnap.exists && cfgSnap.data().sharedUid) {
-    sharedUid = cfgSnap.data().sharedUid;
-  } else {
-    sharedUid = user.uid;
-    await cfgRef.set({ sharedUid }, { merge: true });
+    const sharedUid = await db.runTransaction(async transaction => {
+      const cfgSnap = await transaction.get(cfgRef);
+      if (cfgSnap.exists && cfgSnap.data().sharedUid) {
+        return cfgSnap.data().sharedUid;
+      }
+      const uid = user.uid;
+      transaction.set(cfgRef, { sharedUid: uid }, { merge: true });
+      return uid;
+    });
+
+    _authDone = true;
+    window._uid = sharedUid;
+    document.dispatchEvent(new CustomEvent('firebase:ready', { detail: { uid: sharedUid } }));
+  } catch (err) {
+    console.error('共享 UID 配置失败:', err);
+    _authDone = true;
+    window._uid = user.uid;
+    document.dispatchEvent(new CustomEvent('firebase:ready', { detail: { uid: user.uid } }));
   }
-
-  window._uid = sharedUid;
-  document.dispatchEvent(new CustomEvent('firebase:ready', { detail: { uid: sharedUid } }));
 });

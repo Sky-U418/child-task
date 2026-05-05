@@ -3,17 +3,9 @@
 const TaskManager = (() => {
   const C = APP_CONFIG;
 
-  /** 获取当天 24:00 的 Timestamp */
-  function _getMidnight() {
-    const d = new Date();
-    d.setHours(C.DAILY_RESET_HOUR, 0, 0, 0);
-    return firebase.firestore.Timestamp.fromDate(d);
-  }
-
-  /** 获取下一天 24:00 */
+  /** 获取下一个 24:00（当天结束时刻） */
   function _getNextMidnight() {
     const d = new Date();
-    d.setDate(d.getDate() + 1);
     d.setHours(C.DAILY_RESET_HOUR, 0, 0, 0);
     return firebase.firestore.Timestamp.fromDate(d);
   }
@@ -69,47 +61,64 @@ const TaskManager = (() => {
     return Store.updateTask(taskId, { status: C.TASK_STATUS_IN_PROGRESS });
   }
 
-  /** 孩子获取任务积分 (completed → closed / 每日重置) */
+  /** 孩子获取任务积分 (completed → closed) — 事务保证原子性 */
   async function claimTaskPoints(taskId, uid) {
-    const tasks = await Store.getTasks();
-    const task = tasks.find(t => t.id === taskId);
-    if (!task || task.status !== C.TASK_STATUS_COMPLETED) {
-      throw new Error('任务尚未完成');
-    }
+    return Store.runTransaction(async transaction => {
+      // 读取任务（实时数据）
+      const taskRef = db.collection(C.COLL_TASKS).doc(taskId);
+      const taskDoc = await transaction.get(taskRef);
+      if (!taskDoc.exists) throw new Error('任务不存在');
+      const task = taskDoc.data();
+      if (task.status !== C.TASK_STATUS_COMPLETED) {
+        throw new Error('任务尚未完成');
+      }
 
-    // 计算积分（每日任务享受打卡倍率，限时任务为 1.0x）
-    let multiplier = 1.0;
-    if (task.type === C.TASK_TYPE_DAILY) {
-      const streak = await Store.getStreak(uid);
-      multiplier = StreakManager.getTodayMultiplier(streak);
-    }
-    const earnedPoints = Math.round(task.points * multiplier);
+      // 计算积分享受的倍率
+      let multiplier = 1.0;
+      if (task.type === C.TASK_TYPE_DAILY) {
+        const streakRef = db.collection(C.COLL_STREAK).doc(uid);
+        const streakDoc = await transaction.get(streakRef);
+        if (streakDoc.exists) {
+          multiplier = StreakManager.getTodayMultiplier(streakDoc.data());
+        }
+      }
+      const earnedPoints = Math.round(task.points * multiplier);
 
-    // 添加成果积分
-    await PointsManager.addAchievementPoints(earnedPoints);
+      // 增加成果积分
+      const pointsRef = db.collection(C.COLL_POINTS).doc('config');
+      const pointsDoc = await transaction.get(pointsRef);
+      if (pointsDoc.exists) {
+        const config = pointsDoc.data();
+        transaction.update(pointsRef, {
+          achievementPoints: (config.achievementPoints || 0) + earnedPoints
+        });
+      }
 
-    // 记录任务完成日志（供周报/月报使用）
-    await Store.addTaskLog({
-      userId: uid,
-      taskId: taskId,
-      taskTitle: task.title,
-      points: task.points,
-      multiplier: multiplier,
-      earnedPoints: earnedPoints
-    });
-
-    // 更新任务状态
-    if (task.type === C.TASK_TYPE_DAILY) {
-      await Store.updateTask(taskId, {
-        status: C.TASK_STATUS_CLOSED,
-        completedAt: null,
-        resetAt: _getNextMidnight()
+      // 写入任务日志
+      const logRef = db.collection(C.COLL_TASK_LOG).doc();
+      transaction.set(logRef, {
+        userId: uid,
+        taskId: taskId,
+        taskTitle: task.title,
+        points: task.points,
+        multiplier: multiplier,
+        earnedPoints: earnedPoints,
+        completedAt: firebase.firestore.Timestamp.now()
       });
-    } else {
-      await Store.updateTask(taskId, { status: C.TASK_STATUS_CLOSED });
-    }
 
-    return { earnedPoints, multiplier };
+      // 更新任务状态
+      if (task.type === C.TASK_TYPE_DAILY) {
+        transaction.update(taskRef, {
+          status: C.TASK_STATUS_CLOSED,
+          completedAt: null,
+          resetAt: _getNextMidnight()
+        });
+      } else {
+        transaction.update(taskRef, { status: C.TASK_STATUS_CLOSED });
+      }
+
+      return { earnedPoints, multiplier };
+    });
   }
 
   // ========== 定时检查 ==========

@@ -362,12 +362,14 @@ document.addEventListener('firebase:ready', () => {
       $taskForm.scrollIntoView({ behavior: 'smooth' });
     } else if (action === 'complete') {
       await TaskManager.markCompleted(id);
-      // 检查是否所有每日任务都已完成 → 触发打卡
-      const dailyTasks = allTasks.filter(t => t.type === C.TASK_TYPE_DAILY);
-      if (dailyTasks.length > 0 && dailyTasks.every(t =>
-        t.id === id || t.status === C.TASK_STATUS_COMPLETED
-      )) {
-        await StreakManager.onTaskCompleted(window._uid);
+      // 直接重新查询判断是否所有每日任务已完成，避免 onSnapshot 快照延迟
+      const task = allTasks.find(t => t.id === id);
+      if (task && task.type === C.TASK_TYPE_DAILY) {
+        const fresh = await Store.getTasks();
+        const dailies = fresh.filter(t => t.type === C.TASK_TYPE_DAILY);
+        if (dailies.length > 0 && dailies.every(t => t.status === C.TASK_STATUS_COMPLETED)) {
+          await StreakManager.onTaskCompleted(window._uid);
+        }
       }
       UI.toast('任务已标记为完成', 'success');
     } else if (action === 'close') {
@@ -383,7 +385,6 @@ document.addEventListener('firebase:ready', () => {
       const data = { status: C.TASK_STATUS_AVAILABLE, completedAt: null };
       if (task.type === C.TASK_TYPE_DAILY) {
         const d = new Date();
-        d.setDate(d.getDate() + 1);
         d.setHours(24, 0, 0, 0);
         data.resetAt = firebase.firestore.Timestamp.fromDate(d);
       } else {

@@ -4,36 +4,36 @@ const PointsManager = (() => {
   const C = APP_CONFIG;
 
   /**
-   * 检查并发放每日基础积分
-   * 规则: 每天发放一次，未达上限才发放，发放量不超过上限
+   * 检查并发放每日基础积分（事务保证不重复发放）
    */
   async function grantDailyBasePoints() {
-    const config = await Store.getPointsConfig();
-    const now = new Date();
-    const lastGrant = config.lastBaseGrantAt ? config.lastBaseGrantAt.toDate() : null;
+    try {
+      await Store.runTransaction(async transaction => {
+        const ref = db.collection(C.COLL_POINTS).doc('config');
+        const doc = await transaction.get(ref);
+        if (!doc.exists) return;
 
-    // 判断是否需要发放（今天尚未发放）
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const lastGrantDay = lastGrant
-      ? new Date(lastGrant.getFullYear(), lastGrant.getMonth(), lastGrant.getDate()).getTime()
-      : 0;
+        const config = doc.data();
+        const now = new Date();
+        const lastGrant = config.lastBaseGrantAt ? config.lastBaseGrantAt.toDate() : null;
 
-    if (today > lastGrantDay) {
-      // 可以加的空间
-      const room = Math.max(0, config.basePointsCap - config.currentBasePoints);
-      const toGrant = Math.min(config.dailyBasePoints, room);
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const lastGrantDay = lastGrant
+          ? new Date(lastGrant.getFullYear(), lastGrant.getMonth(), lastGrant.getDate()).getTime()
+          : 0;
 
-      if (toGrant > 0) {
-        await Store.updatePointsConfig({
+        if (today <= lastGrantDay) return;
+
+        const room = Math.max(0, config.basePointsCap - config.currentBasePoints);
+        const toGrant = Math.min(config.dailyBasePoints, room);
+
+        transaction.update(ref, {
           currentBasePoints: config.currentBasePoints + toGrant,
           lastBaseGrantAt: firebase.firestore.Timestamp.now()
         });
-      } else {
-        // 已达上限，只更新时间戳
-        await Store.updatePointsConfig({
-          lastBaseGrantAt: firebase.firestore.Timestamp.now()
-        });
-      }
+      });
+    } catch (err) {
+      console.error('grantDailyBasePoints 失败:', err);
     }
   }
 
@@ -52,35 +52,43 @@ const PointsManager = (() => {
   }
 
   /**
-   * 消费积分（优先基础积分）
+   * 消费积分（优先基础积分）— 事务保证不会超额消费
    * 返回 { success: boolean, remaining: number }
    */
   async function spendPoints(cost) {
-    const config = await Store.getPointsConfig();
+    try {
+      return await Store.runTransaction(async transaction => {
+        const ref = db.collection(C.COLL_POINTS).doc('config');
+        const doc = await transaction.get(ref);
+        if (!doc.exists) {
+          return { success: false, remaining: 0, needed: cost };
+        }
 
-    const total = (config.currentBasePoints || 0) + (config.achievementPoints || 0);
-    if (total < cost) {
-      return { success: false, remaining: total, needed: cost };
+        const config = doc.data();
+        const total = (config.currentBasePoints || 0) + (config.achievementPoints || 0);
+        if (total < cost) {
+          return { success: false, remaining: total, needed: cost };
+        }
+
+        const baseSpend = Math.min(config.currentBasePoints, cost);
+        const achievementSpend = cost - baseSpend;
+
+        transaction.update(ref, {
+          currentBasePoints: config.currentBasePoints - baseSpend,
+          achievementPoints: (config.achievementPoints || 0) - achievementSpend
+        });
+
+        return {
+          success: true,
+          remaining: (config.currentBasePoints - baseSpend) + ((config.achievementPoints || 0) - achievementSpend),
+          baseSpent: baseSpend,
+          achievementSpent: achievementSpend
+        };
+      });
+    } catch (err) {
+      console.error('spendPoints 事务失败:', err);
+      return { success: false, remaining: 0, needed: cost };
     }
-
-    // 先扣基础积分
-    const baseSpend = Math.min(config.currentBasePoints, cost);
-    const achievementSpend = cost - baseSpend;
-
-    const newBase = config.currentBasePoints - baseSpend;
-    const newAchievement = (config.achievementPoints || 0) - achievementSpend;
-
-    await Store.updatePointsConfig({
-      currentBasePoints: newBase,
-      achievementPoints: newAchievement
-    });
-
-    return {
-      success: true,
-      remaining: newBase + newAchievement,
-      baseSpent: baseSpend,
-      achievementSpent: achievementSpend
-    };
   }
 
   /** 重置积分（管理员操作） */

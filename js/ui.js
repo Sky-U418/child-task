@@ -74,25 +74,19 @@ const UI = (() => {
 
     modalEl.appendChild(header);
 
-    // Body
+    // Body（仅接受 HTMLElement，避免 XSS）
     const body = document.createElement('div');
     body.className = 'modal__body';
-    if (typeof opts.body === 'string') {
-      body.innerHTML = opts.body;
-    } else if (opts.body instanceof HTMLElement) {
+    if (opts.body instanceof HTMLElement) {
       body.appendChild(opts.body);
     }
     modalEl.appendChild(body);
 
-    // Footer
-    if (opts.footer) {
+    // Footer（仅接受 HTMLElement，避免 XSS）
+    if (opts.footer instanceof HTMLElement) {
       const footer = document.createElement('div');
       footer.className = 'modal__footer';
-      if (typeof opts.footer === 'string') {
-        footer.innerHTML = opts.footer;
-      } else if (opts.footer instanceof HTMLElement) {
-        footer.appendChild(opts.footer);
-      }
+      footer.appendChild(opts.footer);
       modalEl.appendChild(footer);
     }
 
@@ -126,6 +120,9 @@ const UI = (() => {
    */
   function confirm(title, message, confirmText = '确认', cancelText = '取消') {
     return new Promise(resolve => {
+      const body = document.createElement('p');
+      body.textContent = message;
+
       const footer = document.createElement('div');
       footer.style.display = 'flex';
       footer.style.gap = 'var(--space-sm)';
@@ -145,7 +142,7 @@ const UI = (() => {
       footer.appendChild(cancelBtn);
       footer.appendChild(confirmBtn);
 
-      modal({ title, body: `<p>${message}</p>`, footer });
+      modal({ title, body, footer });
     });
   }
 

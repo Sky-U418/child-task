@@ -364,13 +364,13 @@ document.addEventListener('firebase:ready', async () => {
 
       const ok = await UI.confirm(
         '确认兑换',
-        `确定要用 <strong>${reward.cost}</strong> 积分兑换「${_esc(reward.title)}」吗？`,
+        `确定要用 ${reward.cost} 积分兑换「${reward.title}」吗？`,
         '确认兑换'
       );
       if (!ok) return;
 
       try {
-        await RewardManager.exchangeReward(reward, uid);
+        await RewardManager.exchangeReward(rewardId, uid);
 
         // 粒子动画
         const rewardEl = document.querySelector(`[data-reward-id="${rewardId}"]`);

@@ -19,15 +19,6 @@ const RewardManager = (() => {
     }
 
     if (reward.type === C.REWARD_TYPE_PERIODIC) {
-      // 检查周期是否已过需要重置
-      if (reward.periodResetAt) {
-        const now = firebase.firestore.Timestamp.now();
-        if (now.toMillis() > reward.periodResetAt.toMillis()) {
-          // 已到重置时间 — 理论上次数字应已重置，此处做兜底
-          // 实际重置在 checkPeriodicReset 中完成
-        }
-      }
-
       if (reward.exchangedCount >= reward.maxExchanges) {
         if (reward.period === C.REWARD_PERIOD_DAILY) {
           return { available: false, reason: '今日兑换次数已达上限，明天再来吧' };
@@ -42,37 +33,68 @@ const RewardManager = (() => {
     return { available: true, reason: '' };
   }
 
-  /** 兑换奖励 */
-  async function exchangeReward(reward, uid) {
-    // 1. 检查可兑换性
-    const check = isExchangeable(reward);
-    if (!check.available) {
-      throw new Error(check.reason);
-    }
+  /**
+   * 兑换奖励 — 事务保证原子性（检查→扣积分→增计数→写日志）
+   * @param {string} rewardId - 奖励文档 ID
+   * @param {string} uid - 用户 ID
+   */
+  async function exchangeReward(rewardId, uid) {
+    return Store.runTransaction(async transaction => {
+      // 读取积分
+      const pointsRef = db.collection(C.COLL_POINTS).doc('config');
+      const pointsDoc = await transaction.get(pointsRef);
+      if (!pointsDoc.exists) throw new Error('积分配置不存在');
+      const config = pointsDoc.data();
 
-    // 2. 扣积分
-    const spendResult = await PointsManager.spendPoints(reward.cost);
-    if (!spendResult.success) {
-      throw new Error(`积分不足！需要 ${spendResult.needed} 但只有 ${spendResult.remaining}`);
-    }
+      // 读取奖励（实时数据，非快照）
+      const rewardRef = db.collection(C.COLL_REWARDS).doc(rewardId);
+      const rewardDoc = await transaction.get(rewardRef);
+      if (!rewardDoc.exists) throw new Error('奖励不存在');
+      const reward = { id: rewardDoc.id, ...rewardDoc.data() };
 
-    // 3. 增加兑换次数
-    const newCount = (reward.exchangedCount || 0) + 1;
-    const updateData = { exchangedCount: newCount };
-    if (reward.type === C.REWARD_TYPE_LIMITED && newCount >= reward.maxExchanges) {
-      updateData.exhaustedAt = firebase.firestore.Timestamp.now();
-    }
-    await Store.updateReward(reward.id, updateData);
+      // 检查可兑换性（使用实时数据）
+      const check = isExchangeable(reward);
+      if (!check.available) throw new Error(check.reason);
 
-    // 4. 记录日志
-    await Store.addExchangeLog({
-      userId: uid,
-      rewardId: reward.id,
-      rewardTitle: reward.title,
-      cost: reward.cost
+      // 检查积分余额
+      const total = (config.currentBasePoints || 0) + (config.achievementPoints || 0);
+      if (total < reward.cost) {
+        throw new Error(`积分不足！需要 ${reward.cost} 但只有 ${total}`);
+      }
+
+      // 扣除积分
+      const baseSpend = Math.min(config.currentBasePoints, reward.cost);
+      const achievementSpend = reward.cost - baseSpend;
+      transaction.update(pointsRef, {
+        currentBasePoints: config.currentBasePoints - baseSpend,
+        achievementPoints: (config.achievementPoints || 0) - achievementSpend
+      });
+
+      // 增加兑换次数
+      const newCount = (reward.exchangedCount || 0) + 1;
+      const rewardUpdate = { exchangedCount: newCount };
+      if (reward.type === C.REWARD_TYPE_LIMITED && newCount >= reward.maxExchanges) {
+        rewardUpdate.exhaustedAt = firebase.firestore.Timestamp.now();
+      }
+      transaction.update(rewardRef, rewardUpdate);
+
+      // 写入兑换日志
+      const logRef = db.collection(C.COLL_EXCHANGE_LOG).doc();
+      transaction.set(logRef, {
+        userId: uid,
+        rewardId: rewardId,
+        rewardTitle: reward.title,
+        cost: reward.cost,
+        exchangedAt: firebase.firestore.Timestamp.now()
+      });
+
+      return {
+        success: true,
+        remaining: (config.currentBasePoints - baseSpend) + ((config.achievementPoints || 0) - achievementSpend),
+        baseSpent: baseSpend,
+        achievementSpent: achievementSpend
+      };
     });
-
-    return spendResult;
   }
 
   // ========== 管理员操作 ==========
@@ -140,7 +162,6 @@ const RewardManager = (() => {
         let nextReset;
         if (reward.period === C.REWARD_PERIOD_DAILY) {
           const d = new Date();
-          d.setDate(d.getDate() + 1);
           d.setHours(24, 0, 0, 0);
           nextReset = firebase.firestore.Timestamp.fromDate(d);
         } else if (reward.period === C.REWARD_PERIOD_MONTHLY) {

@@ -1,0 +1,5 @@
+reset-db.html
+.DS_Store
+Thumbs.db
+*.log
+node_modules/

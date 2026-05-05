@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>宇航员看板 — 任务积分</title>
+  <link rel="stylesheet" href="css/common.css?v=15">
+  <link rel="stylesheet" href="css/child.css?v=15">
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+
+  <div class="child-layout">
+    <!-- ===== 顶部状态栏 ===== -->
+    <section class="status-bar" aria-label="积分状态">
+      <!-- 可用积分 — 顶部大数字 -->
+      <div class="points-total-banner">
+        <div class="points-total-banner__value" id="totalPoints">0</div>
+        <div class="points-total-banner__label">可用积分</div>
+      </div>
+
+      <!-- 三栏状态盒子 — 等高对齐 -->
+      <div class="status-boxes">
+        <div class="status-box status-box--streak" id="streakDisplay">
+          <div class="streak-flame" id="streakFlame" aria-label="连续打卡火焰">🔥</div>
+          <div class="streak-days" id="streakDays">0</div>
+          <div class="streak-label">连续打卡</div>
+          <div class="streak-multiplier" id="streakMultiplier">1.0x</div>
+        </div>
+
+        <div class="status-box status-box--base">
+          <div class="status-box__value"><span id="basePoints">0</span>/<span id="basePointsCap">0</span></div>
+          <div class="status-box__label">基础积分</div>
+        </div>
+
+        <div class="status-box status-box--achieve">
+          <div class="status-box__value" id="achievePoints">0</div>
+          <div class="status-box__label">成果积分</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 底部导航 ===== -->
+    <nav class="bottom-nav" role="tablist" aria-label="主导航">
+      <button class="nav-tab is-active" data-panel="tasks" role="tab" aria-selected="true">
+        <span class="nav-tab__icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <circle cx="10" cy="10" r="2" fill="currentColor"/>
+            <line x1="10" y1="3" x2="10" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="10" y1="14" x2="10" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="3" y1="10" x2="6" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="14" y1="10" x2="17" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span>任务</span>
+      </button>
+      <button class="nav-tab" data-panel="shop" role="tab" aria-selected="false">
+        <span class="nav-tab__icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 2l2.5 5 5.5.5-4 3.5 1 5.5-5-3-5 3 1-5.5-4-3.5 5.5-.5L10 2z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span>兑换商店</span>
+      </button>
+      <button class="nav-tab" data-panel="profile" role="tab" aria-selected="false">
+        <span class="nav-tab__icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="6" r="3.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <path d="M4 17c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span>我的</span>
+      </button>
+    </nav>
+
+    <!-- ===== 任务面板 ===== -->
+    <section class="child-panel is-active" id="panel-tasks" role="tabpanel" aria-label="任务列表">
+      <div class="task-grid" id="taskGrid">
+        <div class="empty-state">
+          <div class="empty-state__icon">🛰️</div>
+          <p class="empty-state__text">暂无任务，等待指挥官发布...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 兑换商店面板 ===== -->
+    <section class="child-panel" id="panel-shop" role="tabpanel" aria-label="兑换商店">
+      <div class="reward-grid" id="rewardGrid">
+        <div class="empty-state">
+          <div class="empty-state__icon">🎁</div>
+          <p class="empty-state__text">暂无奖励，等待指挥官设置...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 个人面板 ===== -->
+    <section class="child-panel" id="panel-profile" role="tabpanel" aria-label="个人中心">
+      <div class="config-section">
+        <h3 class="config-section__title">打卡记录</h3>
+        <div class="config-current">
+          <div class="config-current__item">
+            <div class="config-current__value" style="color:var(--color-warning)" id="profileStreak">0</div>
+            <div class="config-current__label">当前连续</div>
+          </div>
+          <div class="config-current__item">
+            <div class="config-current__value" id="profileMaxStreak">0</div>
+            <div class="config-current__label">最长记录</div>
+          </div>
+          <div class="config-current__item">
+            <div class="config-current__value" style="color:var(--color-accent)" id="profileMultiplier">1.0x</div>
+            <div class="config-current__label">积分倍率</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <h3 class="config-section__title">周报</h3>
+        <div class="weekly-cards" id="weeklyCards">
+          <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-md)">加载中...</p>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <div class="monthly-header">
+          <h3 class="config-section__title" style="margin:0">月报</h3>
+          <div class="monthly-nav" id="monthlyNav">
+            <button class="btn btn--ghost btn--xs" id="btnMonthPrev" aria-label="上一月">◀</button>
+            <span class="monthly-nav__label" id="monthLabel">--</span>
+            <button class="btn btn--ghost btn--xs" id="btnMonthNext" aria-label="下一月">▶</button>
+          </div>
+        </div>
+        <div class="monthly-card" id="monthlyCard">
+          <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-md)">加载中...</p>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <div class="section-header section-header--collapsible" id="exchangeLogHeader">
+          <h3 class="config-section__title" style="margin:0">记录</h3>
+          <button class="btn btn--ghost btn--xs" id="btnClearLogs" style="display:none">清空显示</button>
+          <span class="collapse-arrow" id="logCollapseArrow" aria-label="折叠切换">▼</span>
+        </div>
+        <div class="log-list" id="exchangeLogList">
+          <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-lg)">暂无兑换记录</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 报告详情弹窗 -->
+  <div class="report-detail-overlay" id="reportDetailOverlay" style="display:none">
+    <div class="report-detail">
+      <div class="report-detail__header">
+        <h3 class="report-detail__title" id="reportDetailTitle"></h3>
+        <button class="report-detail__close" id="btnReportDetailClose" aria-label="关闭详情">&times;</button>
+      </div>
+      <div class="report-detail__body" id="reportDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- JS 依赖（顺序加载） -->
+  <script src="js/firebase-config.js?v=15"></script>
+  <script src="js/app-config.js?v=15"></script>
+  <script src="js/store.js?v=15"></script>
+  <script src="js/points.js?v=15"></script>
+  <script src="js/tasks.js?v=15"></script>
+  <script src="js/rewards.js?v=15"></script>
+  <script src="js/streak.js?v=15"></script>
+  <script src="js/reports.js?v=15"></script>
+  <script src="js/ui.js?v=15"></script>
+  <script src="js/animations.js?v=15"></script>
+  <script src="js/child-app.js?v=15"></script>
+</body>
+</html>

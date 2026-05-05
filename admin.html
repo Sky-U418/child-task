@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>指挥中心 — 管理员面板</title>
+  <link rel="stylesheet" href="css/common.css?v=13">
+  <link rel="stylesheet" href="css/admin.css?v=13">
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+
+  <!-- ===== PIN 验证界面 ===== -->
+  <div id="pinScreen" class="pin-screen">
+    <div class="pin-screen__icon" aria-hidden="true">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+        <path d="M32 4l8 16 16 4-12 12 4 16-16-8-16 8 4-16-12-12 16-4 8-16z" stroke="#ffb800" stroke-width="2" fill="none" stroke-linejoin="round"/>
+        <circle cx="32" cy="28" r="6" stroke="#ffb800" stroke-width="2" fill="none"/>
+      </svg>
+    </div>
+    <h2 class="pin-screen__title" id="pinTitle">指挥中心验证</h2>
+    <p class="pin-screen__desc" id="pinDesc">请输入管理员密码</p>
+
+    <div class="pin-input-group" id="pinInputs">
+      <input type="password" class="pin-input" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="PIN 第1位">
+      <input type="password" class="pin-input" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="PIN 第2位">
+      <input type="password" class="pin-input" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="PIN 第3位">
+      <input type="password" class="pin-input" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="PIN 第4位">
+      <input type="password" class="pin-input" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="PIN 第5位">
+      <input type="password" class="pin-input" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="PIN 第6位">
+    </div>
+    <p class="pin-error" id="pinError"></p>
+    <button class="btn btn--primary" id="btnPinSubmit" disabled>验证</button>
+  </div>
+
+  <!-- ===== 管理员面板 ===== -->
+  <div id="adminPanel" class="admin-layout" style="display:none">
+    <!-- 头部 -->
+    <header class="admin-header">
+      <h1 class="admin-header__title">COMMAND CENTER</h1>
+      <button class="admin-header__logout" id="btnLogout" aria-label="退出登录">退出</button>
+    </header>
+
+    <!-- Tab 导航 -->
+    <nav class="admin-tabs" role="tablist">
+      <button class="admin-tab is-active" data-panel="tasks" role="tab">任务管理</button>
+      <button class="admin-tab" data-panel="rewards" role="tab">奖励管理</button>
+      <button class="admin-tab" data-panel="points" role="tab">积分配置</button>
+      <button class="admin-tab" data-panel="logs" role="tab">记录</button>
+    </nav>
+
+    <!-- 统计行 -->
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card">
+        <div class="stat-card__value stat-card__value--accent" id="statTotalTasks">0</div>
+        <div class="stat-card__label">总任务数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value stat-card__value--warning" id="statActiveTasks">0</div>
+        <div class="stat-card__label">进行中</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value stat-card__value--success" id="statActiveRewards">0</div>
+        <div class="stat-card__label">可兑换奖励</div>
+      </div>
+    </div>
+
+    <!-- ===== 任务管理面板 ===== -->
+    <div class="admin-panel is-active" id="panel-tasks">
+      <button class="add-card" id="btnAddTask">
+        <span>+</span> 添加新任务
+      </button>
+      <div class="form-panel" id="taskForm" style="display:none">
+        <h3 class="form-panel__title" id="taskFormTitle">添加任务</h3>
+        <div class="form-group">
+          <label class="form-label" for="taskTitle">任务名称</label>
+          <input type="text" class="form-input" id="taskTitle" placeholder="例如：整理书桌" maxlength="50">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="taskDesc">任务描述（可选）</label>
+          <textarea class="form-textarea" id="taskDesc" placeholder="描述任务的具体要求..." rows="2" maxlength="200"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="taskType">任务类型</label>
+            <select class="form-select" id="taskType">
+              <option value="daily">每日任务</option>
+              <option value="timed">限时任务</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="taskPoints">奖励积分</label>
+            <input type="number" class="form-input" id="taskPoints" value="5" min="1" max="999">
+          </div>
+          <div class="form-group" id="deadlineGroup" style="display:none">
+            <label class="form-label" for="taskDeadline">到期日</label>
+            <input type="date" class="form-input" id="taskDeadline">
+          </div>
+        </div>
+        <input type="hidden" id="taskEditId">
+        <div class="form-actions">
+          <button class="btn btn--ghost" id="btnTaskCancel">取消</button>
+          <button class="btn btn--primary" id="btnTaskSave">保存任务</button>
+        </div>
+      </div>
+      <div class="admin-list" id="taskList">
+        <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-xl)">暂无任务，点击上方按钮添加</p>
+      </div>
+    </div>
+
+    <!-- ===== 奖励管理面板 ===== -->
+    <div class="admin-panel" id="panel-rewards">
+      <button class="add-card" id="btnAddReward">
+        <span>+</span> 添加新奖励
+      </button>
+      <div class="form-panel" id="rewardForm" style="display:none">
+        <h3 class="form-panel__title" id="rewardFormTitle">添加奖励</h3>
+        <div class="form-group">
+          <label class="form-label" for="rewardTitle">奖励名称</label>
+          <input type="text" class="form-input" id="rewardTitle" placeholder="例如：看动画片30分钟" maxlength="50">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="rewardDesc">奖励描述（可选）</label>
+          <textarea class="form-textarea" id="rewardDesc" placeholder="描述奖励的具体内容..." rows="2" maxlength="200"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="rewardCost">所需积分</label>
+            <input type="number" class="form-input" id="rewardCost" value="20" min="1" max="9999">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="rewardType">奖励类型</label>
+            <select class="form-select" id="rewardType">
+              <option value="periodic">周期性奖励</option>
+              <option value="limited">限次数奖励</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" id="periodRow">
+          <div class="form-group">
+            <label class="form-label" for="rewardPeriod">重置周期</label>
+            <select class="form-select" id="rewardPeriod">
+              <option value="daily">每日</option>
+              <option value="monthly">每月</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="rewardMaxExchanges">每周期最多兑换</label>
+            <input type="number" class="form-input" id="rewardMaxExchanges" value="1" min="1" max="99">
+          </div>
+        </div>
+        <div class="form-row" id="limitedRow" style="display:none">
+          <div class="form-group">
+            <label class="form-label" for="rewardMaxTotal">总计最多兑换次数</label>
+            <input type="number" class="form-input" id="rewardMaxTotal" value="3" min="1" max="999">
+          </div>
+        </div>
+        <input type="hidden" id="rewardEditId">
+        <div class="form-actions">
+          <button class="btn btn--ghost" id="btnRewardCancel">取消</button>
+          <button class="btn btn--primary" id="btnRewardSave">保存奖励</button>
+        </div>
+      </div>
+      <div class="admin-list" id="rewardList">
+        <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-xl)">暂无奖励，点击上方按钮添加</p>
+      </div>
+    </div>
+
+    <!-- ===== 记录面板 ===== -->
+    <div class="admin-panel" id="panel-logs">
+      <div class="config-section">
+        <h3 class="config-section__title">周报</h3>
+        <div class="weekly-cards" id="adminWeeklyCards">
+          <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-md)">加载中...</p>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <div class="monthly-header">
+          <h3 class="config-section__title" style="margin:0">月报</h3>
+          <div class="monthly-nav" id="adminMonthlyNav">
+            <button class="btn btn--ghost btn--xs" id="btnAdminMonthPrev" aria-label="上一月">◀</button>
+            <span class="monthly-nav__label" id="adminMonthLabel">--</span>
+            <button class="btn btn--ghost btn--xs" id="btnAdminMonthNext" aria-label="下一月">▶</button>
+          </div>
+        </div>
+        <div class="monthly-card" id="adminMonthlyCard">
+          <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-md)">加载中...</p>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <div class="section-header section-header--collapsible" id="adminLogHeader">
+          <h3 class="config-section__title" style="margin:0">记录</h3>
+          <button class="btn btn--ghost btn--xs" id="btnAdminClearLogs" style="display:none">清空显示</button>
+          <span class="collapse-arrow" id="adminLogCollapseArrow" aria-label="折叠切换">▼</span>
+        </div>
+        <div class="log-list" id="adminExchangeLogList">
+          <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-lg)">暂无兑换记录</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 积分配置面板 ===== -->
+    <div class="admin-panel" id="panel-points">
+      <div class="config-section">
+        <h3 class="config-section__title">当前积分状态</h3>
+        <div class="config-current">
+          <div class="config-current__item">
+            <div class="config-current__value" id="cfgBasePoints">0</div>
+            <div class="config-current__label">基础积分</div>
+          </div>
+          <div class="config-current__item">
+            <div class="config-current__value" id="cfgAchievePoints">0</div>
+            <div class="config-current__label">成果积分</div>
+          </div>
+          <div class="config-current__item">
+            <div class="config-current__value" id="cfgTotalPoints" style="color:var(--color-accent)">0</div>
+            <div class="config-current__label">总积分</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <h3 class="config-section__title">基础积分设置</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfgDailyBase">每日自动发放</label>
+            <input type="number" class="form-input" id="cfgDailyBase" min="1" max="9999">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfgCap">基础积分上限</label>
+            <input type="number" class="form-input" id="cfgCap" min="1" max="99999">
+          </div>
+        </div>
+        <div class="form-actions" style="justify-content:flex-start">
+          <button class="btn btn--primary" id="btnSavePointsConfig">保存设置</button>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <h3 class="config-section__title">管理操作</h3>
+        <p style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-md)">
+          修改当前积分余额或重置所有积分。请谨慎操作。
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfgSetBase">直接设定基础积分</label>
+            <input type="number" class="form-input" id="cfgSetBase" min="0" max="99999">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfgSetAchieve">直接设定成果积分</label>
+            <input type="number" class="form-input" id="cfgSetAchieve" min="0" max="99999">
+          </div>
+        </div>
+        <div class="form-actions" style="justify-content:flex-start">
+          <button class="btn btn--outline" id="btnApplyManualPoints">应用修改</button>
+          <button class="btn btn--danger" id="btnResetAllPoints">重置全部积分</button>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <h3 class="config-section__title">连续打卡设置</h3>
+        <div class="config-current">
+          <div class="config-current__item">
+            <div class="config-current__value" style="color:var(--color-warning)" id="cfgStreakDays">0</div>
+            <div class="config-current__label">当前连续天数</div>
+          </div>
+          <div class="config-current__item">
+            <div class="config-current__value" style="color:var(--color-accent)" id="cfgStreakMult">1.0x</div>
+            <div class="config-current__label">当前倍率</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfgSetStreak">强制设定连续天数</label>
+            <input type="number" class="form-input" id="cfgSetStreak" value="0" min="0" max="30">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfgSetMultiplier">或直接设定倍率</label>
+            <input type="number" class="form-input" id="cfgSetMultiplier" value="1.0" min="1.0" max="2.0" step="0.1">
+          </div>
+        </div>
+        <div class="form-actions" style="justify-content:flex-start">
+          <button class="btn btn--outline" id="btnSetStreak">应用连续天数</button>
+          <button class="btn btn--outline" id="btnSetMultiplier">应用倍率</button>
+          <button class="btn btn--danger" id="btnResetStreak">重置打卡</button>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <h3 class="config-section__title">安全设置</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfgNewPIN">修改管理员 PIN（4-8位数字）</label>
+            <input type="password" class="form-input" id="cfgNewPIN" placeholder="输入新PIN" maxlength="8" inputmode="numeric" pattern="[0-9]">
+          </div>
+        </div>
+        <div class="form-actions" style="justify-content:flex-start">
+          <button class="btn btn--outline" id="btnChangePIN">修改 PIN</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 报告详情弹窗 -->
+  <div class="report-detail-overlay" id="adminReportDetailOverlay" style="display:none">
+    <div class="report-detail">
+      <div class="report-detail__header">
+        <h3 class="report-detail__title" id="adminReportDetailTitle"></h3>
+        <button class="report-detail__close" id="btnAdminReportDetailClose" aria-label="关闭详情">&times;</button>
+      </div>
+      <div class="report-detail__body" id="adminReportDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- JS 依赖（顺序加载） -->
+  <script src="js/firebase-config.js?v=13"></script>
+  <script src="js/app-config.js?v=13"></script>
+  <script src="js/store.js?v=13"></script>
+  <script src="js/points.js?v=13"></script>
+  <script src="js/tasks.js?v=13"></script>
+  <script src="js/rewards.js?v=13"></script>
+  <script src="js/streak.js?v=13"></script>
+  <script src="js/reports.js?v=13"></script>
+  <script src="js/ui.js?v=13"></script>
+  <script src="js/router.js?v=13"></script>
+  <script src="js/admin-app.js?v=13"></script>
+</body>
+</html>

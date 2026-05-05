@@ -50,7 +50,9 @@ document.addEventListener('firebase:ready', async () => {
   const $logCollapseArrow = document.getElementById('logCollapseArrow');
   const $btnClearLogs = document.getElementById('btnClearLogs');
 
-  let hiddenLogIds = new Set();
+  function _getLogHiddenBefore() {
+    return parseInt(localStorage.getItem('exchangeLogHiddenBefore') || '0', 10);
+  }
 
   // State
   let tasks = [];
@@ -105,14 +107,11 @@ document.addEventListener('firebase:ready', async () => {
     $logCollapseArrow.classList.toggle('is-collapsed');
   });
 
-  // 清空显示（仅过滤当前可见记录，不删后台数据）
-  $btnClearLogs.addEventListener('click', async () => {
-    try {
-      const logs = await Store.getExchangeLogs();
-      logs.forEach(l => hiddenLogIds.add(l.id));
-      loadExchangeLogs();
-      UI.toast('显示已清空', 'info');
-    } catch (err) { /* 静默 */ }
+  // 清空显示（记录时间戳，不删后台数据）
+  $btnClearLogs.addEventListener('click', () => {
+    localStorage.setItem('exchangeLogHiddenBefore', Date.now().toString());
+    loadExchangeLogs();
+    UI.toast('显示已清空', 'info');
   });
 
   // ========== Tab 导航 ==========
@@ -221,10 +220,10 @@ document.addEventListener('firebase:ready', async () => {
       return `
         <div class="task-card ${statusClass}" data-task-id="${t.id}">
           <div class="task-card__header">
-            <span class="task-card__title">${_esc(t.title)}</span>
+            <span class="task-card__title">${SharedUI.esc(t.title)}</span>
             <span class="task-card__points">+${t.points}</span>
           </div>
-          ${t.description ? `<p class="task-card__desc">${_esc(t.description)}</p>` : ''}
+          ${t.description ? `<p class="task-card__desc">${SharedUI.esc(t.description)}</p>` : ''}
           <div class="task-card__footer">
             <span class="task-card__status">
               <span class="status-dot status-dot--${t.status}"></span>
@@ -340,10 +339,10 @@ document.addEventListener('firebase:ready', async () => {
       return `
         <div class="reward-card ${cardClass}" data-reward-id="${r.id}">
           <div class="reward-card__header">
-            <span class="reward-card__title">${_esc(r.title)}</span>
+            <span class="reward-card__title">${SharedUI.esc(r.title)}</span>
             <span class="reward-card__cost">${r.cost} 积分</span>
           </div>
-          ${r.description ? `<p class="reward-card__desc">${_esc(r.description)}</p>` : ''}
+          ${r.description ? `<p class="reward-card__desc">${SharedUI.esc(r.description)}</p>` : ''}
           <p class="reward-card__meta">${metaStr}</p>
           ${btnHTML}
         </div>
@@ -386,63 +385,6 @@ document.addEventListener('firebase:ready', async () => {
 
   // ========== 报告 ==========
 
-  function _renderReportCard(r, type) {
-    const startDate = new Date(r.periodStart + 'T00:00:00');
-    const endDate = new Date(r.periodEnd + 'T00:00:00');
-    const dateStr = `${startDate.getMonth() + 1}/${startDate.getDate()} - ${endDate.getMonth() + 1}/${endDate.getDate()}`;
-    const reportKey = type;
-
-    let title, cardClass;
-    if (type === 'lastWeek') {
-      title = '上周';
-      cardClass = 'report-card--weekly';
-    } else if (type === 'thisWeek') {
-      title = '本周';
-      cardClass = 'report-card--weekly';
-    } else {
-      title = `${startDate.getMonth() + 1}月`;
-      cardClass = 'report-card--monthly';
-    }
-
-    const _sv = (stat, color) =>
-      `<div class="report-card__stat-value" style="color:${color}" data-report-key="${reportKey}" data-stat="${stat}">${r[stat]}</div>`;
-
-    return `
-      <div class="report-card ${cardClass}">
-        <div class="report-card__header">
-          <span class="report-card__title">${title}</span>
-          <span class="report-card__date">${dateStr}</span>
-        </div>
-        <div class="report-card__stats">
-          <div class="report-card__stat">
-            ${_sv('checkInDays', 'var(--color-warning)')}
-            <div class="report-card__stat-label">打卡天数</div>
-          </div>
-          <div class="report-card__stat">
-            ${_sv('maxStreakInPeriod', 'var(--color-warning)')}
-            <div class="report-card__stat-label">最长连续</div>
-          </div>
-          <div class="report-card__stat">
-            ${_sv('tasksCompleted', 'var(--color-success)')}
-            <div class="report-card__stat-label">完成任务</div>
-          </div>
-          <div class="report-card__stat">
-            ${_sv('pointsEarned', 'var(--color-success)')}
-            <div class="report-card__stat-label">获得积分</div>
-          </div>
-          <div class="report-card__stat">
-            ${_sv('rewardsExchanged', 'var(--color-accent)')}
-            <div class="report-card__stat-label">兑换奖励</div>
-          </div>
-          <div class="report-card__stat">
-            ${_sv('pointsSpent', 'var(--color-accent)')}
-            <div class="report-card__stat-label">消耗积分</div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   async function loadWeeklyReports() {
     try {
       const thisWeek = ReportManager.getWeekRange(new Date());
@@ -456,9 +398,9 @@ document.addEventListener('firebase:ready', async () => {
       reportData.thisWeek = thisData;
 
       $weeklyCards.innerHTML =
-        _renderReportCard(lastData, 'lastWeek') +
-        _renderReportCard(thisData, 'thisWeek');
-    } catch (err) { /* 静默 */ }
+        SharedUI.renderReportCard(lastData, 'lastWeek') +
+        SharedUI.renderReportCard(thisData, 'thisWeek');
+    } catch (err) { _handleReportError(err, $weeklyCards); }
   }
 
   async function loadMonthlyReport(monthOffset) {
@@ -471,12 +413,27 @@ document.addEventListener('firebase:ready', async () => {
 
       const startDate = new Date(range.start + 'T00:00:00');
       $monthLabel.textContent = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月`;
-      $monthlyCard.innerHTML = _renderReportCard(data, 'monthly');
+      $monthlyCard.innerHTML = SharedUI.renderReportCard(data, 'monthly');
 
       // 当前月禁用"下一月"
       $btnMonthNext.disabled = (monthOffset === 0);
       $btnMonthNext.style.opacity = monthOffset === 0 ? '0.3' : '';
-    } catch (err) { /* 静默 */ }
+    } catch (err) { _handleReportError(err, $monthlyCard); }
+  }
+
+  function _handleReportError(err, $container) {
+    console.error('报告加载失败:', err);
+    const msg = err.message || '';
+    if (msg.includes('index') || msg.includes('FAILED_PRECONDITION')) {
+      const urlMatch = msg.match(/https?:\/\/[^\s]+/);
+      const link = urlMatch ? urlMatch[0] : '';
+      $container.innerHTML = `<p style="color:var(--color-danger);text-align:center;padding:var(--space-md);font-size:var(--text-sm)">
+        数据库索引未创建。<br>请在 Firebase Console 中创建复合索引：<br>
+        ${link ? `<a href="${link}" target="_blank" rel="noopener" style="color:var(--color-accent);word-break:break-all">点击创建索引</a>` : '请检查 taskLog 和 exchangeLog 集合的复合索引'}
+      </p>`;
+    } else {
+      $container.innerHTML = `<p style="color:var(--color-text-muted);text-align:center;padding:var(--space-md)">报告加载失败，请刷新重试</p>`;
+    }
   }
 
   $btnMonthPrev.addEventListener('click', () => loadMonthlyReport(currentMonthOffset - 1));
@@ -523,80 +480,7 @@ document.addEventListener('firebase:ready', async () => {
     };
 
     $reportDetailTitle.textContent = `${statLabels[stat]} · ${rangeStr}`;
-
-    let bodyHTML = '';
-
-    switch (stat) {
-      case 'checkInDays':
-        if (r.dateStrings && r.dateStrings.length > 0) {
-          bodyHTML = '<div class="detail-date-list">' +
-            r.dateStrings.map(d => `<span class="detail-date-chip">${d}</span>`).join('') +
-            '</div>';
-        } else {
-          bodyHTML = '<div class="detail-empty">该周期无打卡记录</div>';
-        }
-        break;
-
-      case 'maxStreakInPeriod':
-        bodyHTML = `<div class="detail-empty" style="color:var(--color-warning);font-family:var(--font-display);font-size:var(--text-lg)">${r.maxStreakInPeriod} 天</div>`;
-        break;
-
-      case 'tasksCompleted':
-        if (r.taskBreakdown && r.taskBreakdown.length > 0) {
-          bodyHTML = `<table class="detail-table">
-            <thead><tr><th>任务</th><th>次数</th></tr></thead>
-            <tbody>${r.taskBreakdown.map(t => `<tr>
-              <td>${_esc(t.title)}</td>
-              <td><span class="detail-table__number">${t.count}</span></td>
-            </tr>`).join('')}</tbody></table>`;
-        } else {
-          bodyHTML = '<div class="detail-empty">该周期无完成任务</div>';
-        }
-        break;
-
-      case 'pointsEarned':
-        if (r.taskBreakdown && r.taskBreakdown.length > 0) {
-          bodyHTML = `<table class="detail-table">
-            <thead><tr><th>任务</th><th>次数</th><th>积分</th></tr></thead>
-            <tbody>${r.taskBreakdown.map(t => `<tr>
-              <td>${_esc(t.title)}</td>
-              <td><span class="detail-table__number">${t.count}</span></td>
-              <td><span class="detail-table__number">${t.totalPoints}</span></td>
-            </tr>`).join('')}</tbody></table>`;
-        } else {
-          bodyHTML = '<div class="detail-empty">该周期无获得积分</div>';
-        }
-        break;
-
-      case 'rewardsExchanged':
-        if (r.rewardBreakdown && r.rewardBreakdown.length > 0) {
-          bodyHTML = `<table class="detail-table">
-            <thead><tr><th>奖励</th><th>次数</th></tr></thead>
-            <tbody>${r.rewardBreakdown.map(rw => `<tr>
-              <td>${_esc(rw.title)}</td>
-              <td><span class="detail-table__number">${rw.count}</span></td>
-            </tr>`).join('')}</tbody></table>`;
-        } else {
-          bodyHTML = '<div class="detail-empty">该周期无兑换奖励</div>';
-        }
-        break;
-
-      case 'pointsSpent':
-        if (r.rewardBreakdown && r.rewardBreakdown.length > 0) {
-          bodyHTML = `<table class="detail-table">
-            <thead><tr><th>奖励</th><th>次数</th><th>消耗</th></tr></thead>
-            <tbody>${r.rewardBreakdown.map(rw => `<tr>
-              <td>${_esc(rw.title)}</td>
-              <td><span class="detail-table__number">${rw.count}</span></td>
-              <td><span class="detail-table__number">${rw.totalCost}</span></td>
-            </tr>`).join('')}</tbody></table>`;
-        } else {
-          bodyHTML = '<div class="detail-empty">该周期无消耗积分</div>';
-        }
-        break;
-    }
-
-    $reportDetailBody.innerHTML = bodyHTML;
+    $reportDetailBody.innerHTML = SharedUI.renderReportDetailBody(r, stat);
     $reportDetailOverlay.style.display = 'flex';
   }
 
@@ -605,7 +489,10 @@ document.addEventListener('firebase:ready', async () => {
   async function loadExchangeLogs() {
     try {
       const logs = await Store.getExchangeLogs();
-      const visibleLogs = logs.filter(l => !hiddenLogIds.has(l.id));
+      const hiddenBefore = _getLogHiddenBefore();
+      const visibleLogs = hiddenBefore
+        ? logs.filter(l => l.exchangedAt.toDate().getTime() > hiddenBefore)
+        : logs;
 
       if (visibleLogs.length === 0) {
         $exchangeLogList.innerHTML = '<p style="color:var(--color-text-muted);text-align:center;padding:var(--space-lg)">暂无兑换记录</p>';
@@ -614,30 +501,10 @@ document.addEventListener('firebase:ready', async () => {
       }
 
       $btnClearLogs.style.display = '';
-      $exchangeLogList.innerHTML = visibleLogs.map(l => {
-        let timeStr = '';
-        if (l.exchangedAt) {
-          const d = l.exchangedAt.toDate();
-          timeStr = `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-        }
-        return `
-          <div class="log-item">
-            <span class="log-item__title">${_esc(l.rewardTitle)}</span>
-            <span class="log-item__cost">-${l.cost}</span>
-            <span class="log-item__time">${timeStr}</span>
-          </div>
-        `;
-      }).join('');
+      $exchangeLogList.innerHTML = visibleLogs.map(l => SharedUI.renderExchangeLogItem(l)).join('');
     } catch (err) {
       // 静默失败
     }
   }
 
-  // ========== 工具 ==========
-
-  function _esc(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
 });

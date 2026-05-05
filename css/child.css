@@ -503,13 +503,11 @@
 }
 
 .report-card--weekly {
-  border-color: var(--color-accent);
-  border-opacity: 0.3;
+  border-color: rgba(0, 212, 255, 0.25);
 }
 
 .report-card--monthly {
-  border-color: var(--color-warning);
-  border-opacity: 0.3;
+  border-color: rgba(255, 184, 0, 0.25);
 }
 
 .report-card__header {

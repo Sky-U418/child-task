@@ -164,7 +164,7 @@ const Store = (() => {
   function getExchangeLogs() {
     return db.collection(C.COLL_EXCHANGE_LOG)
       .orderBy('exchangedAt', 'desc')
-      .limit(50)
+      .limit(200)
       .get()
       .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }

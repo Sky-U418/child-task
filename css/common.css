@@ -14,6 +14,7 @@
   --color-bg-card: #161e33;
   --color-bg-card-hover: #1c2540;
   --color-bg-input: #0d1220;
+  --color-bg-surface: #111827;
 
   /* 颜色 - 强调 */
   --color-accent: #00d4ff;
@@ -70,6 +71,7 @@
   --shadow-glow-accent: 0 0 12px var(--color-accent-glow);
   --shadow-glow-success: 0 0 12px var(--color-success-glow);
   --shadow-glow-warning: 0 0 12px var(--color-warning-glow);
+  --shadow-glow-danger: 0 0 12px var(--color-danger-glow);
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3);
   --shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.5);
 

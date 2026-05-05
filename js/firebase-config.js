@@ -21,10 +21,21 @@ auth.signInAnonymously().catch(err => {
   console.error('Firebase Auth 失败:', err);
 });
 
-// 等待认证完成再初始化应用
-auth.onAuthStateChanged(user => {
-  if (user) {
-    window._uid = user.uid;
-    document.dispatchEvent(new CustomEvent('firebase:ready', { detail: { uid: user.uid } }));
+// 共享 UID：所有设备使用同一个 ID，解决跨设备数据不一致问题
+auth.onAuthStateChanged(async user => {
+  if (!user) return;
+
+  const cfgRef = db.collection('appConfig').doc('config');
+  const cfgSnap = await cfgRef.get();
+  let sharedUid;
+
+  if (cfgSnap.exists && cfgSnap.data().sharedUid) {
+    sharedUid = cfgSnap.data().sharedUid;
+  } else {
+    sharedUid = user.uid;
+    await cfgRef.set({ sharedUid }, { merge: true });
   }
+
+  window._uid = sharedUid;
+  document.dispatchEvent(new CustomEvent('firebase:ready', { detail: { uid: sharedUid } }));
 });

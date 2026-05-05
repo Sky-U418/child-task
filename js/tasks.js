@@ -109,9 +109,6 @@ const TaskManager = (() => {
       await Store.updateTask(taskId, { status: C.TASK_STATUS_CLOSED });
     }
 
-    // 更新打卡
-    await StreakManager.onTaskCompleted(uid);
-
     return { earnedPoints, multiplier };
   }
 

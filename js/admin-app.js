@@ -362,6 +362,13 @@ document.addEventListener('firebase:ready', () => {
       $taskForm.scrollIntoView({ behavior: 'smooth' });
     } else if (action === 'complete') {
       await TaskManager.markCompleted(id);
+      // 检查是否所有每日任务都已完成 → 触发打卡
+      const dailyTasks = allTasks.filter(t => t.type === C.TASK_TYPE_DAILY);
+      if (dailyTasks.length > 0 && dailyTasks.every(t =>
+        t.id === id || t.status === C.TASK_STATUS_COMPLETED
+      )) {
+        await StreakManager.onTaskCompleted(window._uid);
+      }
       UI.toast('任务已标记为完成', 'success');
     } else if (action === 'close') {
       const now = firebase.firestore.Timestamp.now();

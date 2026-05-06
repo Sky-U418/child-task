@@ -132,7 +132,7 @@ const SharedUI = (() => {
     let timeStr = '';
     if (l.exchangedAt) {
       const d = l.exchangedAt.toDate();
-      timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      timeStr = `${d.getMonth() + 1}/${d.getDate()}`;
     }
     return `
       <div class="log-item">
@@ -143,5 +143,21 @@ const SharedUI = (() => {
     `;
   }
 
-  return { esc, renderReportCard, renderReportDetailBody, renderExchangeLogItem };
+  /** 渲染单条扣分日志 HTML */
+  function renderDeductionLogItem(l) {
+    let timeStr = '';
+    if (l.deductedAt) {
+      const d = l.deductedAt.toDate();
+      timeStr = `${d.getMonth() + 1}/${d.getDate()}`;
+    }
+    return `
+      <div class="log-item log-item--deduction">
+        <span class="log-item__title">${esc(l.reason)}</span>
+        <span class="log-item__cost">-${l.amount}</span>
+        <span class="log-item__time">${timeStr}</span>
+      </div>
+    `;
+  }
+
+  return { esc, renderReportCard, renderReportDetailBody, renderExchangeLogItem, renderDeductionLogItem };
 })();

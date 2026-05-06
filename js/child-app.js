@@ -488,20 +488,39 @@ document.addEventListener('firebase:ready', async () => {
 
   async function loadExchangeLogs() {
     try {
-      const logs = await Store.getExchangeLogs();
-      const hiddenBefore = _getLogHiddenBefore();
-      const visibleLogs = hiddenBefore
-        ? logs.filter(l => l.exchangedAt.toDate().getTime() > hiddenBefore)
-        : logs;
+      const [exchangeLogs, deductionLogs] = await Promise.all([
+        Store.getExchangeLogs(),
+        Store.getDeductionLogs()
+      ]);
 
-      if (visibleLogs.length === 0) {
-        $exchangeLogList.innerHTML = '<p style="color:var(--color-text-muted);text-align:center;padding:var(--space-lg)">暂无兑换记录</p>';
+      const hiddenBefore = _getLogHiddenBefore();
+
+      const visibleExchanges = hiddenBefore
+        ? exchangeLogs.filter(l => l.exchangedAt.toDate().getTime() > hiddenBefore)
+        : exchangeLogs;
+
+      const visibleDeductions = hiddenBefore
+        ? deductionLogs.filter(l => l.deductedAt.toDate().getTime() > hiddenBefore)
+        : deductionLogs;
+
+      const allLogs = [
+        ...visibleExchanges.map(l => ({ ...l, _type: 'exchange', _time: l.exchangedAt.toDate().getTime() })),
+        ...visibleDeductions.map(l => ({ ...l, _type: 'deduction', _time: l.deductedAt.toDate().getTime() }))
+      ].sort((a, b) => b._time - a._time);
+
+      if (allLogs.length === 0) {
+        $exchangeLogList.innerHTML = '<p style="color:var(--color-text-muted);text-align:center;padding:var(--space-lg)">暂无记录</p>';
         $btnClearLogs.style.display = 'none';
         return;
       }
 
       $btnClearLogs.style.display = '';
-      $exchangeLogList.innerHTML = visibleLogs.map(l => SharedUI.renderExchangeLogItem(l)).join('');
+      $exchangeLogList.innerHTML = allLogs.map(l => {
+        if (l._type === 'deduction') {
+          return SharedUI.renderDeductionLogItem(l);
+        }
+        return SharedUI.renderExchangeLogItem(l);
+      }).join('');
     } catch (err) {
       // 静默失败
     }

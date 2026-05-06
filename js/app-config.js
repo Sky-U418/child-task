@@ -21,6 +21,7 @@ const APP_CONFIG = Object.freeze({
   COLL_STREAK: 'streak',
   COLL_EXCHANGE_LOG: 'exchangeLog',
   COLL_TASK_LOG: 'taskLog',
+  COLL_DEDUCTION_LOG: 'deductionLog',
   COLL_APP_CONFIG: 'appConfig',
 
   // 任务类型

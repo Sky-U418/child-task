@@ -186,6 +186,36 @@ const Store = (() => {
       .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }
 
+  // ========== 扣分日志 ==========
+
+  function addDeductionLog(data) {
+    const doc = {
+      ...data,
+      deductedAt: firebase.firestore.Timestamp.now()
+    };
+    return db.collection(C.COLL_DEDUCTION_LOG).add(doc);
+  }
+
+  function getDeductionLogs() {
+    return db.collection(C.COLL_DEDUCTION_LOG)
+      .orderBy('deductedAt', 'desc')
+      .limit(200)
+      .get()
+      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
+
+  function getDeductionLogsByDateRange(uid, fromDateStr, toDateStr) {
+    const fromDate = new Date(fromDateStr + 'T00:00:00');
+    const toDate = new Date(toDateStr + 'T23:59:59.999');
+    return db.collection(C.COLL_DEDUCTION_LOG)
+      .where('userId', '==', uid)
+      .where('deductedAt', '>=', firebase.firestore.Timestamp.fromDate(fromDate))
+      .where('deductedAt', '<=', firebase.firestore.Timestamp.fromDate(toDate))
+      .orderBy('deductedAt', 'asc')
+      .get()
+      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
+
   // ========== 任务日志 ==========
 
   function addTaskLog(data) {
@@ -270,6 +300,7 @@ const Store = (() => {
     getPointsConfig, onPointsConfigChange, updatePointsConfig, setPointsConfig,
     getStreak, onStreakChange, updateStreak, setStreak,
     addExchangeLog, getExchangeLogs, getExchangeLogsByDateRange,
+    addDeductionLog, getDeductionLogs, getDeductionLogsByDateRange,
     addTaskLog, getTaskLogs,
     getAppConfig, updateAppConfig, setAppConfig, onAppConfigChange,
     runTransaction, batchWrite

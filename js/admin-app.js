@@ -76,6 +76,11 @@ document.addEventListener('firebase:ready', () => {
   const $btnSetMultiplier = document.getElementById('btnSetMultiplier');
   const $btnResetStreak = document.getElementById('btnResetStreak');
 
+  // Deduction
+  const $cfgDeductAmount = document.getElementById('cfgDeductAmount');
+  const $cfgDeductReason = document.getElementById('cfgDeductReason');
+  const $btnDeductPoints = document.getElementById('btnDeductPoints');
+
   // Reports
   const $adminWeeklyCards = document.getElementById('adminWeeklyCards');
   const $adminMonthlyCard = document.getElementById('adminMonthlyCard');
@@ -861,6 +866,32 @@ document.addEventListener('firebase:ready', () => {
     UI.toast('打卡数据已重置', 'info');
   });
 
+  // ========== 扣分处理 ==========
+
+  $btnDeductPoints.addEventListener('click', async () => {
+    const amount = parseInt($cfgDeductAmount.value, 10);
+    const reason = $cfgDeductReason.value.trim();
+
+    if (!amount || amount <= 0) { UI.toast('请输入有效的扣除积分数', 'error'); return; }
+    if (!reason) { UI.toast('请输入扣除理由', 'error'); return; }
+
+    const ok = await UI.confirm('确认扣分', `确定要扣除 ${amount} 积分吗？理由：「${reason}」`);
+    if (!ok) return;
+
+    try {
+      const result = await PointsManager.deductPoints(amount, reason, window._uid);
+      const msg = result.actualDeduct < amount
+        ? `已扣除 ${result.actualDeduct} 积分（可用积分不足，已归零）`
+        : `已扣除 ${result.actualDeduct} 积分`;
+      UI.toast(msg, 'info');
+      $cfgDeductAmount.value = '';
+      $cfgDeductReason.value = '';
+      loadAdminExchangeLogs();
+    } catch (err) {
+      UI.toast('扣分失败: ' + err.message, 'error');
+    }
+  });
+
   // ========== 退出 ==========
 
   $btnLogout.addEventListener('click', () => {
@@ -966,20 +997,40 @@ document.addEventListener('firebase:ready', () => {
 
   async function loadAdminExchangeLogs() {
     try {
-      const logs = await Store.getExchangeLogs();
-      const hiddenBefore = _getLogHiddenBefore();
-      const visibleLogs = hiddenBefore
-        ? logs.filter(l => l.exchangedAt.toDate().getTime() > hiddenBefore)
-        : logs;
+      const [exchangeLogs, deductionLogs] = await Promise.all([
+        Store.getExchangeLogs(),
+        Store.getDeductionLogs()
+      ]);
 
-      if (visibleLogs.length === 0) {
-        $adminExchangeLogList.innerHTML = '<p style="color:var(--color-text-muted);text-align:center;padding:var(--space-lg)">暂无兑换记录</p>';
+      const hiddenBefore = _getLogHiddenBefore();
+
+      const visibleExchanges = hiddenBefore
+        ? exchangeLogs.filter(l => l.exchangedAt.toDate().getTime() > hiddenBefore)
+        : exchangeLogs;
+
+      const visibleDeductions = hiddenBefore
+        ? deductionLogs.filter(l => l.deductedAt.toDate().getTime() > hiddenBefore)
+        : deductionLogs;
+
+      // 合并并按时间倒序
+      const allLogs = [
+        ...visibleExchanges.map(l => ({ ...l, _type: 'exchange', _time: l.exchangedAt.toDate().getTime() })),
+        ...visibleDeductions.map(l => ({ ...l, _type: 'deduction', _time: l.deductedAt.toDate().getTime() }))
+      ].sort((a, b) => b._time - a._time);
+
+      if (allLogs.length === 0) {
+        $adminExchangeLogList.innerHTML = '<p style="color:var(--color-text-muted);text-align:center;padding:var(--space-lg)">暂无记录</p>';
         $btnAdminClearLogs.style.display = 'none';
         return;
       }
 
       $btnAdminClearLogs.style.display = '';
-      $adminExchangeLogList.innerHTML = visibleLogs.map(l => SharedUI.renderExchangeLogItem(l)).join('');
+      $adminExchangeLogList.innerHTML = allLogs.map(l => {
+        if (l._type === 'deduction') {
+          return SharedUI.renderDeductionLogItem(l);
+        }
+        return SharedUI.renderExchangeLogItem(l);
+      }).join('');
     } catch (err) { /* 静默 */ }
   }
 

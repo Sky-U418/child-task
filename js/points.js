@@ -91,6 +91,48 @@ const PointsManager = (() => {
     }
   }
 
+  /**
+   * 管理员扣除积分（优先基础积分，不出现负数）
+   * @param {number} amount - 扣除金额
+   * @param {string} reason - 扣除理由
+   * @param {string} uid - 用户ID
+   * @returns {{ actualDeduct: number, baseDeducted: number, achievementDeducted: number }}
+   */
+  async function deductPoints(amount, reason, uid) {
+    if (!amount || amount <= 0) throw new Error('扣除积分必须大于0');
+
+    return Store.runTransaction(async transaction => {
+      const ref = db.collection(C.COLL_POINTS).doc('config');
+      const doc = await transaction.get(ref);
+      if (!doc.exists) throw new Error('积分配置不存在');
+
+      const config = doc.data();
+      const total = (config.currentBasePoints || 0) + (config.achievementPoints || 0);
+      const actualDeduct = Math.min(amount, total);
+
+      const baseDeducted = Math.min(config.currentBasePoints || 0, actualDeduct);
+      const achievementDeducted = actualDeduct - baseDeducted;
+
+      transaction.update(ref, {
+        currentBasePoints: (config.currentBasePoints || 0) - baseDeducted,
+        achievementPoints: (config.achievementPoints || 0) - achievementDeducted
+      });
+
+      // 在事务内写扣分日志
+      const logRef = db.collection(C.COLL_DEDUCTION_LOG).doc();
+      transaction.set(logRef, {
+        userId: uid,
+        reason: reason,
+        amount: actualDeduct,
+        baseDeducted: baseDeducted,
+        achievementDeducted: achievementDeducted,
+        deductedAt: firebase.firestore.Timestamp.now()
+      });
+
+      return { actualDeduct, baseDeducted, achievementDeducted };
+    });
+  }
+
   /** 重置积分（管理员操作） */
   async function resetAllPoints() {
     await Store.updatePointsConfig({
@@ -104,6 +146,7 @@ const PointsManager = (() => {
     getTotalPoints,
     addAchievementPoints,
     spendPoints,
+    deductPoints,
     resetAllPoints
   };
 })();

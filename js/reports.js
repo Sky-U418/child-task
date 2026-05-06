@@ -65,9 +65,10 @@ const ReportManager = (() => {
   // ========== 实时计算报告（不存储）==========
 
   async function computeReport(uid, periodStart, periodEnd) {
-    const [taskLogs, exchangeLogs] = await Promise.all([
+    const [taskLogs, exchangeLogs, deductionLogs] = await Promise.all([
       Store.getTaskLogs(uid, periodStart, periodEnd),
-      Store.getExchangeLogsByDateRange(uid, periodStart, periodEnd)
+      Store.getExchangeLogsByDateRange(uid, periodStart, periodEnd),
+      Store.getDeductionLogsByDateRange(uid, periodStart, periodEnd)
     ]);
 
     const dateSet = new Set();
@@ -96,6 +97,12 @@ const ReportManager = (() => {
       rewardByTitle[l.rewardTitle].totalCost += (l.cost || 0);
       pointsSpent += (l.cost || 0);
     }
+
+    let totalDeducted = 0;
+    for (const l of deductionLogs) {
+      totalDeducted += (l.amount || 0);
+    }
+    pointsSpent += totalDeducted;
 
     const dateStrings = [...dateSet].sort().map(d => {
       const parts = d.split('-');

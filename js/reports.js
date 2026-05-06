@@ -101,6 +101,12 @@ const ReportManager = (() => {
     let totalDeducted = 0;
     for (const l of deductionLogs) {
       totalDeducted += (l.amount || 0);
+      const key = '⚠ ' + (l.reason || '积分扣除');
+      if (!rewardByTitle[key]) {
+        rewardByTitle[key] = { count: 0, totalCost: 0 };
+      }
+      rewardByTitle[key].count++;
+      rewardByTitle[key].totalCost += (l.amount || 0);
     }
     pointsSpent += totalDeducted;
 

@@ -213,7 +213,14 @@ const Store = (() => {
       .where('deductedAt', '<=', firebase.firestore.Timestamp.fromDate(toDate))
       .orderBy('deductedAt', 'asc')
       .get()
-      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      .catch(err => {
+        if (err.message && (err.message.includes('index') || err.message.includes('FAILED_PRECONDITION'))) {
+          console.warn('deductionLog 复合索引未创建，扣分数据暂不计入报告。请创建索引:', err.message);
+          return [];
+        }
+        throw err;
+      });
   }
 
   // ========== 任务日志 ==========

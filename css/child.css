@@ -34,7 +34,7 @@
 
 .points-total-banner__value {
   font-family: var(--font-display);
-  font-size: 2.6rem;
+  font-size: 2.85rem;
   font-weight: 900;
   color: var(--color-text-primary);
   line-height: 1;
@@ -87,7 +87,7 @@
 
 .status-box__value {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 800;
   line-height: 1;
 }
@@ -105,7 +105,7 @@
 }
 
 .status-box__label {
-  font-size: 10px;
+  font-size: 14px;
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -113,7 +113,7 @@
 
 /* 打卡内部元素 */
 .streak-flame {
-  font-size: 1.8rem;
+  font-size: 2.05rem;
   line-height: 1;
   transition: transform 0.3s ease;
   filter: drop-shadow(0 0 8px rgba(255, 184, 0, 0.5));
@@ -130,7 +130,7 @@
 
 .streak-days {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 900;
   color: var(--color-warning);
   line-height: 1;
@@ -138,7 +138,7 @@
 }
 
 .streak-label {
-  font-size: 10px;
+  font-size: 14px;
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -181,7 +181,7 @@
   color: var(--color-text-secondary);
   cursor: pointer;
   font-family: var(--font-body);
-  font-size: 10px;
+  font-size: 14px;
   padding: var(--space-xs) var(--space-sm);
   transition: color var(--transition-fast);
   -webkit-tap-highlight-color: transparent;
@@ -192,7 +192,7 @@
 }
 
 .nav-tab__icon {
-  font-size: 1.3rem;
+  font-size: 1.55rem;
   line-height: 1;
 }
 
@@ -415,7 +415,7 @@
 }
 
 .empty-state__icon {
-  font-size: 3rem;
+  font-size: 3.25rem;
   margin-bottom: var(--space-md);
   opacity: 0.4;
 }
@@ -524,7 +524,7 @@
 }
 
 .report-card__date {
-  font-size: 10px;
+  font-size: 14px;
   color: var(--color-text-muted);
 }
 
@@ -546,7 +546,7 @@
 }
 
 .report-card__stat-label {
-  font-size: 8px;
+  font-size: 12px;
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -606,7 +606,7 @@
   background: none;
   border: none;
   color: var(--color-text-muted);
-  font-size: 24px;
+  font-size: 28px;
   cursor: pointer;
   line-height: 1;
   padding: 0;
@@ -691,7 +691,7 @@
 }
 
 .collapse-arrow {
-  font-size: 10px;
+  font-size: 14px;
   color: var(--color-text-muted);
   transition: transform var(--transition-fast);
   margin-left: auto;
@@ -702,7 +702,7 @@
 }
 
 .btn--xs {
-  font-size: 10px;
+  font-size: 14px;
   padding: 2px 8px;
   margin-left: auto;
 }

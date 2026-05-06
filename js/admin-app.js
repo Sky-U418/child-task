@@ -474,7 +474,7 @@ document.addEventListener('firebase:ready', () => {
       if (task && task.type === C.TASK_TYPE_DAILY) {
         const fresh = await Store.getTasks();
         const dailies = fresh.filter(t => t.type === C.TASK_TYPE_DAILY);
-        if (dailies.length > 0 && dailies.every(t => t.status === C.TASK_STATUS_COMPLETED)) {
+        if (dailies.length > 0 && dailies.every(t => t.status === C.TASK_STATUS_COMPLETED || t.status === C.TASK_STATUS_CLOSED)) {
           await StreakManager.onTaskCompleted(window._uid);
         }
       }

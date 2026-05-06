@@ -284,8 +284,14 @@ document.addEventListener('firebase:ready', () => {
     $adminPanel.style.display = 'block';
 
     // 一次性迁移：为缺少 order 字段的文档补充初始值
+    // 注意：不能用 Store.getTasks/getRewards，因为它们的 orderBy('order') 会过滤掉缺少 order 的文档
     try {
-      const [tasks, rewards] = await Promise.all([Store.getTasks(), Store.getRewards()]);
+      const [taskSnap, rewardSnap] = await Promise.all([
+        db.collection(C.COLL_TASKS).get(),
+        db.collection(C.COLL_REWARDS).get()
+      ]);
+      const tasks = taskSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const rewards = rewardSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const migrateOps = [];
       if (tasks.some(t => t.order === undefined)) {
         const sorted = [...tasks].sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));

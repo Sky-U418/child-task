@@ -747,6 +747,9 @@
 .log-item--deduction {
   border-left: 3px solid var(--color-danger);
 }
+.log-item--deduction .log-item__cost {
+  color: var(--color-danger);
+}
 
 /* ----- 响应式 ----- */
 @media (min-width: 768px) {

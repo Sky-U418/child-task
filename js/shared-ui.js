@@ -116,11 +116,15 @@ const SharedUI = (() => {
         if (r.rewardBreakdown && r.rewardBreakdown.length > 0) {
           return `<table class="detail-table">
             <thead><tr><th>奖励</th><th>次数</th><th>消耗</th></tr></thead>
-            <tbody>${r.rewardBreakdown.map(rw => `<tr>
-              <td>${esc(rw.title)}</td>
-              <td><span class="detail-table__number">${rw.count}</span></td>
-              <td><span class="detail-table__number">${rw.totalCost}</span></td>
-            </tr>`).join('')}</tbody></table>`;
+            <tbody>${r.rewardBreakdown.map(rw => {
+              const isDeduction = rw.title.startsWith('⚠ ');
+              const cls = isDeduction ? 'detail-table__number detail-table__number--danger' : 'detail-table__number';
+              return `<tr>
+                <td>${esc(rw.title)}</td>
+                <td><span class="${cls}">${rw.count}</span></td>
+                <td><span class="${cls}">${rw.totalCost}</span></td>
+              </tr>`;
+            }).join('')}</tbody></table>`;
         }
         return '<div class="detail-empty">该周期无消耗积分</div>';
     }

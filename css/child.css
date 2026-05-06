@@ -654,6 +654,9 @@
   font-family: var(--font-display);
   color: var(--color-accent);
 }
+.detail-table .detail-table__number--danger {
+  color: var(--color-danger);
+}
 
 .detail-date-list {
   display: flex;

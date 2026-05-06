@@ -5,21 +5,34 @@ const Store = (() => {
   const C = APP_CONFIG;
   const ORDER_INTERVAL = 1000;
 
+  /** 客户端排序 — 按 order 字段（缺省视为 0），order 相同则按 createdAt */
+  function _sortByOrder(items) {
+    return items.sort((a, b) => {
+      const aOrder = a.order || 0;
+      const bOrder = b.order || 0;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      const aTime = a.createdAt?.toMillis?.() || 0;
+      const bTime = b.createdAt?.toMillis?.() || 0;
+      return aTime - bTime;
+    });
+  }
+
   // ========== 任务 ==========
 
   function getTasks() {
     return db.collection(C.COLL_TASKS)
-      .orderBy('order', 'asc')
       .get()
-      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      .then(snap => {
+        const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return _sortByOrder(tasks);
+      });
   }
 
   function onTasksChange(callback) {
     return db.collection(C.COLL_TASKS)
-      .orderBy('order', 'asc')
       .onSnapshot(snap => {
         const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        callback(tasks);
+        callback(_sortByOrder(tasks));
       });
   }
 
@@ -45,17 +58,18 @@ const Store = (() => {
 
   function getRewards() {
     return db.collection(C.COLL_REWARDS)
-      .orderBy('order', 'asc')
       .get()
-      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      .then(snap => {
+        const rewards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return _sortByOrder(rewards);
+      });
   }
 
   function onRewardsChange(callback) {
     return db.collection(C.COLL_REWARDS)
-      .orderBy('order', 'asc')
       .onSnapshot(snap => {
         const rewards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        callback(rewards);
+        callback(_sortByOrder(rewards));
       });
   }
 

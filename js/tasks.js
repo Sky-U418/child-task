@@ -19,13 +19,14 @@ const TaskManager = (() => {
   // ========== 管理员操作 ==========
 
   /** 创建任务 */
-  async function createTask({ title, description, type, points, deadline }) {
+  async function createTask({ title, description, type, points, deadline, order }) {
     const data = {
       title,
       description: description || '',
       type,
       points: parseInt(points, 10) || 1,
       status: C.TASK_STATUS_AVAILABLE,
+      order: order || null,
       deadline: null,
       resetAt: null,
       completedAt: null,

@@ -3,19 +3,20 @@
 
 const Store = (() => {
   const C = APP_CONFIG;
+  const ORDER_INTERVAL = 1000;
 
   // ========== 任务 ==========
 
   function getTasks() {
     return db.collection(C.COLL_TASKS)
-      .orderBy('createdAt', 'desc')
+      .orderBy('order', 'asc')
       .get()
       .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }
 
   function onTasksChange(callback) {
     return db.collection(C.COLL_TASKS)
-      .orderBy('createdAt', 'desc')
+      .orderBy('order', 'asc')
       .onSnapshot(snap => {
         const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         callback(tasks);
@@ -26,6 +27,7 @@ const Store = (() => {
     const doc = {
       ...data,
       status: C.TASK_STATUS_AVAILABLE,
+      order: data.order || null,
       createdAt: firebase.firestore.Timestamp.now()
     };
     return db.collection(C.COLL_TASKS).add(doc);
@@ -43,14 +45,14 @@ const Store = (() => {
 
   function getRewards() {
     return db.collection(C.COLL_REWARDS)
-      .orderBy('createdAt', 'desc')
+      .orderBy('order', 'asc')
       .get()
       .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }
 
   function onRewardsChange(callback) {
     return db.collection(C.COLL_REWARDS)
-      .orderBy('createdAt', 'desc')
+      .orderBy('order', 'asc')
       .onSnapshot(snap => {
         const rewards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         callback(rewards);
@@ -62,6 +64,7 @@ const Store = (() => {
       ...data,
       exchangedCount: 0,
       isActive: true,
+      order: data.order || null,
       createdAt: firebase.firestore.Timestamp.now()
     };
     return db.collection(C.COLL_REWARDS).add(doc);
@@ -247,6 +250,7 @@ const Store = (() => {
   }
 
   return {
+    ORDER_INTERVAL,
     getTasks, onTasksChange, addTask, updateTask, deleteTask,
     getRewards, onRewardsChange, addReward, updateReward, deleteReward,
     getPointsConfig, onPointsConfigChange, updatePointsConfig, setPointsConfig,

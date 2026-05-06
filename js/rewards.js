@@ -100,7 +100,7 @@ const RewardManager = (() => {
   // ========== 管理员操作 ==========
 
   /** 创建奖励 */
-  async function createReward({ title, description, cost, type, period, maxExchanges }) {
+  async function createReward({ title, description, cost, type, period, maxExchanges, order }) {
     const data = {
       title,
       description: description || '',
@@ -108,6 +108,7 @@ const RewardManager = (() => {
       type,
       period: type === C.REWARD_TYPE_PERIODIC ? period : null,
       maxExchanges: parseInt(maxExchanges, 10) || C.REWARD_MAX_EXCHANGES_DEFAULT,
+      order: order || null,
       periodResetAt: null
     };
 

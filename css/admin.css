@@ -173,6 +173,15 @@
   flex-shrink: 0;
 }
 
+.sort-btns {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: var(--space-sm);
+  padding-left: var(--space-sm);
+  border-left: 1px solid var(--color-border);
+  opacity: 0.7;
+}
+
 /* ----- 类型徽章 ----- */
 .tag {
   display: inline-block;

@@ -105,6 +105,72 @@ document.addEventListener('firebase:ready', () => {
   let allTasks = [];
   let allRewards = [];
 
+  // ========== 排序工具函数 ==========
+
+  const ORDER_INTERVAL = Store.ORDER_INTERVAL;
+  const MIN_ORDER_GAP = 0.5;
+
+  function getNextOrder(items) {
+    if (!items || items.length === 0) return ORDER_INTERVAL;
+    const maxOrder = Math.max(...items.map(i => i.order || 0));
+    return maxOrder + ORDER_INTERVAL;
+  }
+
+  function needsRebalance(items) {
+    const sorted = [...items].sort((a, b) => (a.order || 0) - (b.order || 0));
+    for (let i = 1; i < sorted.length; i++) {
+      if ((sorted[i].order || 0) - (sorted[i - 1].order || 0) < MIN_ORDER_GAP) return true;
+    }
+    return false;
+  }
+
+  async function rebalanceItems(items, collectionName) {
+    const sorted = [...items].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const ops = sorted.map((item, i) => ({
+      collection: collectionName,
+      id: item.id,
+      type: 'update',
+      data: { order: ORDER_INTERVAL + i * ORDER_INTERVAL }
+    }));
+    await Store.batchWrite(ops);
+  }
+
+  async function handleMoveUp(collectionName, id, items) {
+    const sorted = [...items].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const idx = sorted.findIndex(i => i.id === id);
+    if (idx <= 0) return;
+    const current = sorted[idx];
+    const prev = sorted[idx - 1];
+    const currentOrder = current.order || 0;
+    const prevOrder = prev.order || 0;
+    const ops = [
+      { collection: collectionName, id: current.id, type: 'update', data: { order: prevOrder } },
+      { collection: collectionName, id: prev.id, type: 'update', data: { order: currentOrder } }
+    ];
+    await Store.batchWrite(ops);
+    if (needsRebalance(items)) {
+      await rebalanceItems(items, collectionName);
+    }
+  }
+
+  async function handleMoveDown(collectionName, id, items) {
+    const sorted = [...items].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const idx = sorted.findIndex(i => i.id === id);
+    if (idx < 0 || idx >= sorted.length - 1) return;
+    const current = sorted[idx];
+    const next = sorted[idx + 1];
+    const currentOrder = current.order || 0;
+    const nextOrder = next.order || 0;
+    const ops = [
+      { collection: collectionName, id: current.id, type: 'update', data: { order: nextOrder } },
+      { collection: collectionName, id: next.id, type: 'update', data: { order: currentOrder } }
+    ];
+    await Store.batchWrite(ops);
+    if (needsRebalance(items)) {
+      await rebalanceItems(items, collectionName);
+    }
+  }
+
   // ========== PIN 验证 ==========
   // 状态机: 'verify' | 'setup' | 'done'
   let pinState = 'verify';
@@ -217,6 +283,33 @@ document.addEventListener('firebase:ready', () => {
     $pinScreen.style.display = 'none';
     $adminPanel.style.display = 'block';
 
+    // 一次性迁移：为缺少 order 字段的文档补充初始值
+    try {
+      const [tasks, rewards] = await Promise.all([Store.getTasks(), Store.getRewards()]);
+      const migrateOps = [];
+      if (tasks.some(t => t.order === undefined)) {
+        const sorted = [...tasks].sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
+        sorted.forEach((t, i) => {
+          migrateOps.push({
+            collection: C.COLL_TASKS, id: t.id, type: 'update',
+            data: { order: ORDER_INTERVAL + i * ORDER_INTERVAL }
+          });
+        });
+      }
+      if (rewards.some(r => r.order === undefined)) {
+        const sorted = [...rewards].sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
+        sorted.forEach((r, i) => {
+          migrateOps.push({
+            collection: C.COLL_REWARDS, id: r.id, type: 'update',
+            data: { order: ORDER_INTERVAL + i * ORDER_INTERVAL }
+          });
+        });
+      }
+      if (migrateOps.length > 0) {
+        await Store.batchWrite(migrateOps);
+      }
+    } catch (e) { /* migration failure is non-fatal */ }
+
     // 实时监听
     Store.onTasksChange(tasks => {
       allTasks = tasks;
@@ -293,7 +386,7 @@ document.addEventListener('firebase:ready', () => {
       return;
     }
 
-    $taskList.innerHTML = allTasks.map(t => {
+    $taskList.innerHTML = allTasks.map((t, idx) => {
       const statusLabels = {
         available: '可领取',
         in_progress: '进行中',
@@ -317,6 +410,10 @@ document.addEventListener('firebase:ready', () => {
       }
       actions.push(`<button class="btn btn--outline btn--sm" data-action="reset" data-id="${t.id}">重置任务</button>`);
       actions.push(`<button class="btn btn--danger btn--sm" data-action="delete" data-id="${t.id}">删除</button>`);
+
+      const isFirst = idx === 0;
+      const isLast = idx === allTasks.length - 1;
+      actions.push(`<span class="sort-btns"><button class="btn btn--ghost btn--sm" data-action="moveUp" data-id="${t.id}" ${isFirst ? 'disabled' : ''} title="上移">▲</button><button class="btn btn--ghost btn--sm" data-action="moveDown" data-id="${t.id}" ${isLast ? 'disabled' : ''} title="下移">▼</button></span>`);
 
       return `
         <div class="admin-list-item">
@@ -400,6 +497,10 @@ document.addEventListener('firebase:ready', () => {
         await TaskManager.removeTask(id);
         UI.toast('任务已删除', 'info');
       }
+    } else if (action === 'moveUp') {
+      await handleMoveUp(C.COLL_TASKS, id, allTasks);
+    } else if (action === 'moveDown') {
+      await handleMoveDown(C.COLL_TASKS, id, allTasks);
     }
   });
 
@@ -455,7 +556,8 @@ document.addEventListener('firebase:ready', () => {
         // 创建新任务
         await TaskManager.createTask({
           ...data,
-          deadline: $taskType.value === 'timed' ? _dateToEndOfDay($taskDeadline.value) : null
+          deadline: $taskType.value === 'timed' ? _dateToEndOfDay($taskDeadline.value) : null,
+          order: getNextOrder(allTasks)
         });
         UI.toast('任务创建成功', 'success');
       }
@@ -474,7 +576,7 @@ document.addEventListener('firebase:ready', () => {
       return;
     }
 
-    $rewardList.innerHTML = allRewards.map(r => {
+    $rewardList.innerHTML = allRewards.map((r, idx) => {
       const typeLabel = r.type === 'periodic' ? '周期性' : '限次数';
       const typeClass = r.type === 'periodic' ? 'tag--periodic' : 'tag--limited';
       const periodStr = r.period === 'daily' ? '每日' : r.period === 'monthly' ? '每月' : '';
@@ -485,6 +587,10 @@ document.addEventListener('firebase:ready', () => {
       actions.push(`<button class="btn btn--sm ${r.isActive ? 'btn--ghost' : 'btn--success'}" data-action="toggle" data-id="${r.id}">${r.isActive ? '停用' : '启用'}</button>`);
       actions.push(`<button class="btn btn--outline btn--sm" data-action="resetReward" data-id="${r.id}">重置奖励</button>`);
       actions.push(`<button class="btn btn--danger btn--sm" data-action="deleteReward" data-id="${r.id}">删除</button>`);
+
+      const isFirst = idx === 0;
+      const isLast = idx === allRewards.length - 1;
+      actions.push(`<span class="sort-btns"><button class="btn btn--ghost btn--sm" data-action="moveUp" data-id="${r.id}" ${isFirst ? 'disabled' : ''} title="上移">▲</button><button class="btn btn--ghost btn--sm" data-action="moveDown" data-id="${r.id}" ${isLast ? 'disabled' : ''} title="下移">▼</button></span>`);
 
       return `
         <div class="admin-list-item">
@@ -552,6 +658,10 @@ document.addEventListener('firebase:ready', () => {
         await RewardManager.removeReward(id);
         UI.toast('奖励已删除', 'info');
       }
+    } else if (action === 'moveUp') {
+      await handleMoveUp(C.COLL_REWARDS, id, allRewards);
+    } else if (action === 'moveDown') {
+      await handleMoveDown(C.COLL_REWARDS, id, allRewards);
     }
   });
 
@@ -608,7 +718,7 @@ document.addEventListener('firebase:ready', () => {
         await Store.updateReward(editId, data);
         UI.toast('奖励更新成功', 'success');
       } else {
-        await RewardManager.createReward(data);
+        await RewardManager.createReward({ ...data, order: getNextOrder(allRewards) });
         UI.toast('奖励创建成功', 'success');
       }
       $rewardEditId.value = '';

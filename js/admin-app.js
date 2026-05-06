@@ -419,7 +419,7 @@ document.addEventListener('firebase:ready', () => {
 
       const isFirst = idx === 0;
       const isLast = idx === allTasks.length - 1;
-      actions.push(`<span class="sort-btns"><button class="btn btn--ghost btn--sm" data-action="moveUp" data-id="${t.id}" ${isFirst ? 'disabled' : ''} title="上移">▲</button><button class="btn btn--ghost btn--sm" data-action="moveDown" data-id="${t.id}" ${isLast ? 'disabled' : ''} title="下移">▼</button></span>`);
+      actions.unshift(`<span class="sort-btns"><button class="btn btn--ghost btn--sm" data-action="moveUp" data-id="${t.id}" ${isFirst ? 'disabled' : ''} title="上移">▲</button><button class="btn btn--ghost btn--sm" data-action="moveDown" data-id="${t.id}" ${isLast ? 'disabled' : ''} title="下移">▼</button></span>`);
 
       return `
         <div class="admin-list-item">
@@ -596,7 +596,7 @@ document.addEventListener('firebase:ready', () => {
 
       const isFirst = idx === 0;
       const isLast = idx === allRewards.length - 1;
-      actions.push(`<span class="sort-btns"><button class="btn btn--ghost btn--sm" data-action="moveUp" data-id="${r.id}" ${isFirst ? 'disabled' : ''} title="上移">▲</button><button class="btn btn--ghost btn--sm" data-action="moveDown" data-id="${r.id}" ${isLast ? 'disabled' : ''} title="下移">▼</button></span>`);
+      actions.unshift(`<span class="sort-btns"><button class="btn btn--ghost btn--sm" data-action="moveUp" data-id="${r.id}" ${isFirst ? 'disabled' : ''} title="上移">▲</button><button class="btn btn--ghost btn--sm" data-action="moveDown" data-id="${r.id}" ${isLast ? 'disabled' : ''} title="下移">▼</button></span>`);
 
       return `
         <div class="admin-list-item">

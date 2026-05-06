@@ -170,26 +170,25 @@
 .admin-list-item__actions {
   display: flex;
   gap: var(--space-xs);
-  flex-shrink: 0;
   flex-wrap: wrap;
 }
 
 .sort-btns {
   display: inline-flex;
   gap: 2px;
-  margin-left: auto;
-  padding-left: var(--space-sm);
-  border-left: 1px solid var(--color-border);
+  margin-right: var(--space-sm);
+  padding-right: var(--space-sm);
+  border-right: 1px solid var(--color-border);
   opacity: 0.7;
 }
 
 @media (max-width: 767px) {
   .sort-btns {
     flex-basis: 100%;
-    margin-left: 0;
-    padding-left: 0;
-    border-left: none;
-    justify-content: flex-end;
+    margin-right: 0;
+    padding-right: 0;
+    border-right: none;
+    justify-content: flex-start;
   }
 }
 

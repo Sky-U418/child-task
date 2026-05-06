@@ -205,20 +205,15 @@ const Store = (() => {
   }
 
   function getDeductionLogsByDateRange(uid, fromDateStr, toDateStr) {
-    // 不使用服务端复合查询（避免依赖 userId+deductedAt 复合索引），客户端过滤
-    const fromTime = new Date(fromDateStr + 'T00:00:00').getTime();
-    const toTime = new Date(toDateStr + 'T23:59:59.999').getTime();
+    const fromDate = new Date(fromDateStr + 'T00:00:00');
+    const toDate = new Date(toDateStr + 'T23:59:59.999');
     return db.collection(C.COLL_DEDUCTION_LOG)
+      .where('userId', '==', uid)
+      .where('deductedAt', '>=', firebase.firestore.Timestamp.fromDate(fromDate))
+      .where('deductedAt', '<=', firebase.firestore.Timestamp.fromDate(toDate))
       .orderBy('deductedAt', 'asc')
       .get()
-      .then(snap => {
-        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        return all.filter(l => {
-          if (l.userId !== uid) return false;
-          const t = l.deductedAt.toDate().getTime();
-          return t >= fromTime && t <= toTime;
-        });
-      });
+      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }
 
   // ========== 任务日志 ==========

@@ -171,6 +171,7 @@
   display: flex;
   gap: var(--space-xs);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .sort-btns {
@@ -661,6 +662,10 @@
   }
 
   .admin-list-item {
+    flex-wrap: nowrap;
+  }
+
+  .admin-list-item__actions {
     flex-wrap: nowrap;
   }
 

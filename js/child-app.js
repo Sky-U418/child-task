@@ -228,6 +228,20 @@ document.addEventListener('firebase:ready', async () => {
     return /drive\.google\.com|1drv\.ms|onedrive\.live\.com/.test(url);
   }
 
+  function isBilibiliUrl(url) {
+    return /bilibili\.com\/video\/|b23\.tv/.test(url);
+  }
+
+  function getBilibiliEmbedUrl(url) {
+    // BV 号: bilibili.com/video/BVxxxxxxxxx
+    const bv = url.match(/bilibili\.com\/video\/(BV[a-zA-Z0-9]+)/);
+    if (bv) return 'https://player.bilibili.com/player.html?bvid=' + bv[1] + '&autoplay=1';
+    // AV 号 (旧格式): bilibili.com/video/av123456
+    const av = url.match(/bilibili\.com\/video\/(av\d+)/i);
+    if (av) return 'https://player.bilibili.com/player.html?aid=' + av[1].replace('av', '') + '&autoplay=1';
+    return url;
+  }
+
   // ========== 小黑板渲染 ==========
 
   function renderBlackboard(data) {
@@ -266,6 +280,9 @@ document.addEventListener('firebase:ready', async () => {
       } else if (rct.startsWith('video/')) {
         if (isYouTubeUrl(url)) {
           $blackboardYoutubeIframe.src = getYouTubeEmbedUrl(url);
+          $blackboardYoutube.style.display = '';
+        } else if (isBilibiliUrl(url)) {
+          $blackboardYoutubeIframe.src = getBilibiliEmbedUrl(url);
           $blackboardYoutube.style.display = '';
         } else if (isNonEmbeddableUrl(url)) {
           $blackboardExtLinkName.textContent = data.resourceName || '视频资源';

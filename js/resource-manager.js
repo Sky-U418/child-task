@@ -11,7 +11,7 @@ const ResourceManager = (() => {
   function add({ name, url, type }) {
     return Store.addResource({
       name: name || url.split('/').pop().split('?')[0] || 'untitled',
-      url,
+      url: normalizeUrl(url, type),
       contentType: contentTypeMap[type] || type
     });
   }
@@ -20,5 +20,17 @@ const ResourceManager = (() => {
     return Store.deleteResource(id);
   }
 
-  return { add, remove };
+  /** 将常见分享链接转为直链，便于预览 */
+  function normalizeUrl(url, type) {
+    if (type !== 'image') return url;
+
+    // Google Drive: /file/d/{id}/view → uc?export=view&id={id}
+    const gdMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+    if (gdMatch) {
+      return 'https://drive.google.com/uc?export=view&id=' + gdMatch[1];
+    }
+    return url;
+  }
+
+  return { add, remove, normalizeUrl };
 })();

@@ -1052,7 +1052,7 @@ document.addEventListener('firebase:ready', () => {
     $resourceGrid.innerHTML = resources.map(r => {
       let preview;
       if (r.contentType && r.contentType.startsWith('image/')) {
-        preview = `<img class="resource-card__preview" src="${r.url}" alt="${SharedUI.esc(r.name)}">`;
+        preview = `<img class="resource-card__preview" src="${r.url}" alt="${SharedUI.esc(r.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="resource-card__preview resource-card__preview--icon" style="display:none">🖼️</div>`;
       } else if (r.contentType && r.contentType.startsWith('audio/')) {
         preview = `<div class="resource-card__preview resource-card__preview--icon">🎵</div>`;
       } else if (r.contentType && r.contentType.startsWith('video/')) {

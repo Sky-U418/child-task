@@ -92,6 +92,7 @@ document.addEventListener('firebase:ready', () => {
   const $bbStatus = document.getElementById('bbStatus');
   const $bbText = document.getElementById('bbText');
   const $btnBBPushText = document.getElementById('btnBBPushText');
+  const $btnBBClearText = document.getElementById('btnBBClearText');
   const $btnBBClear = document.getElementById('btnBBClear');
 
   // Reports
@@ -1136,6 +1137,11 @@ document.addEventListener('firebase:ready', () => {
     } catch (err) {
       UI.toast('推送失败: ' + err.message, 'error');
     }
+  });
+
+  // 清空文字输入
+  $btnBBClearText.addEventListener('click', () => {
+    $bbText.value = '';
   });
 
   // 清空黑板

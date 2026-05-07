@@ -1,42 +1,24 @@
-// resource-manager.js — 资源管理（上传/删除/预览）
+// resource-manager.js — 资源管理（URL 方式，无 Storage 依赖）
 
 const ResourceManager = (() => {
-  const C = APP_CONFIG;
-  const storage = firebase.storage();
+  const contentTypeMap = {
+    image: 'image/png',
+    audio: 'audio/mpeg',
+    video: 'video/mp4',
+    other: 'application/octet-stream'
+  };
 
-  /** 上传文件到 Storage 并写入 Firestore */
-  async function upload(file, onProgress) {
-    const ext = file.name.split('.').pop();
-    const path = 'resources/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
-    const uploadTask = storage.ref(path).put(file, { contentType: file.type });
-
-    if (onProgress) {
-      uploadTask.on('state_changed',
-        snap => onProgress(snap.bytesTransferred / snap.totalBytes * 100)
-      );
-    }
-
-    await uploadTask;
-    const url = await uploadTask.snapshot.ref.getDownloadURL();
-
-    const doc = await Store.addResource({
-      name: file.name,
+  function add({ name, url, type }) {
+    return Store.addResource({
+      name: name || url.split('/').pop().split('?')[0] || 'untitled',
       url,
-      path,
-      contentType: file.type,
-      size: file.size
+      contentType: contentTypeMap[type] || type
     });
-
-    return { id: doc.id, name: file.name, url, contentType: file.type, size: file.size };
   }
 
-  /** 删除资源（Firestore + Storage） */
-  async function remove(id, path) {
-    await Store.deleteResource(id);
-    if (path) {
-      try { await storage.ref(path).delete(); } catch (_) { /* 文件可能已删除 */ }
-    }
+  function remove(id) {
+    return Store.deleteResource(id);
   }
 
-  return { upload, remove };
+  return { add, remove };
 })();

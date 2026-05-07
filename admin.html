@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>指挥中心 — 管理员面板</title>
-  <link rel="stylesheet" href="css/common.css?v=35">
-  <link rel="stylesheet" href="css/admin.css?v=35">
+  <link rel="stylesheet" href="css/common.css?v=36">
+  <link rel="stylesheet" href="css/admin.css?v=36">
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-storage-compat.js"></script>
+
 </head>
 <body>
 
@@ -210,17 +210,29 @@
     <!-- ===== 资源管理面板 ===== -->
     <div class="admin-panel" id="panel-resources">
       <div class="config-section">
-        <h3 class="config-section__title">上传资源</h3>
-        <div class="upload-area" id="uploadArea">
-          <input type="file" class="upload-area__input" id="fileInput" multiple accept="image/*,audio/*,video/*">
-          <div class="upload-area__icon" aria-hidden="true">+</div>
-          <p class="upload-area__text">点击或拖拽文件到此处上传</p>
-          <p class="upload-area__hint">支持图片、音频、视频文件</p>
+        <h3 class="config-section__title">添加资源</h3>
+        <div class="form-group">
+          <label class="form-label" for="resUrl">资源 URL</label>
+          <input type="url" class="form-input" id="resUrl" placeholder="粘贴 Google Drive / OneDrive 分享链接...">
         </div>
-        <div class="upload-progress" id="uploadProgress" style="display:none">
-          <div class="upload-progress__bar" id="uploadProgressBar"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="resName">名称</label>
+            <input type="text" class="form-input" id="resName" placeholder="自定义名称" maxlength="100">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="resType">类型</label>
+            <select class="form-select" id="resType">
+              <option value="image">图片</option>
+              <option value="audio">音频</option>
+              <option value="video">视频</option>
+              <option value="other">其他</option>
+            </select>
+          </div>
         </div>
-        <p class="upload-status" id="uploadStatus"></p>
+        <div class="form-actions" style="justify-content:flex-start">
+          <button class="btn btn--primary" id="btnAddResource">添加</button>
+        </div>
       </div>
       <div class="config-section">
         <h3 class="config-section__title">资源列表</h3>
@@ -364,18 +376,18 @@
   </div>
 
   <!-- JS 依赖（顺序加载） -->
-  <script src="js/firebase-config.js?v=35"></script>
-  <script src="js/app-config.js?v=35"></script>
-  <script src="js/store.js?v=35"></script>
-  <script src="js/points.js?v=35"></script>
-  <script src="js/tasks.js?v=35"></script>
-  <script src="js/rewards.js?v=35"></script>
-  <script src="js/streak.js?v=35"></script>
-  <script src="js/reports.js?v=35"></script>
-  <script src="js/shared-ui.js?v=35"></script>
-  <script src="js/ui.js?v=35"></script>
-  <script src="js/router.js?v=35"></script>
-  <script src="js/resource-manager.js?v=35"></script>
-  <script src="js/admin-app.js?v=35"></script>
+  <script src="js/firebase-config.js?v=36"></script>
+  <script src="js/app-config.js?v=36"></script>
+  <script src="js/store.js?v=36"></script>
+  <script src="js/points.js?v=36"></script>
+  <script src="js/tasks.js?v=36"></script>
+  <script src="js/rewards.js?v=36"></script>
+  <script src="js/streak.js?v=36"></script>
+  <script src="js/reports.js?v=36"></script>
+  <script src="js/shared-ui.js?v=36"></script>
+  <script src="js/ui.js?v=36"></script>
+  <script src="js/router.js?v=36"></script>
+  <script src="js/resource-manager.js?v=36"></script>
+  <script src="js/admin-app.js?v=36"></script>
 </body>
 </html>

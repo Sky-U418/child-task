@@ -81,6 +81,14 @@ document.addEventListener('firebase:ready', () => {
   const $cfgDeductReason = document.getElementById('cfgDeductReason');
   const $btnDeductPoints = document.getElementById('btnDeductPoints');
 
+  // Resources
+  const $fileInput = document.getElementById('fileInput');
+  const $uploadArea = document.getElementById('uploadArea');
+  const $uploadProgress = document.getElementById('uploadProgress');
+  const $uploadProgressBar = document.getElementById('uploadProgressBar');
+  const $uploadStatus = document.getElementById('uploadStatus');
+  const $resourceGrid = document.getElementById('resourceGrid');
+
   // Reports
   const $adminWeeklyCards = document.getElementById('adminWeeklyCards');
   const $adminMonthlyCard = document.getElementById('adminMonthlyCard');
@@ -1032,6 +1040,101 @@ document.addEventListener('firebase:ready', () => {
         return SharedUI.renderExchangeLogItem(l);
       }).join('');
     } catch (err) { /* 静默 */ }
+  }
+
+  // ========== 资源管理 ==========
+
+  function renderResources(resources) {
+    if (!resources || resources.length === 0) {
+      $resourceGrid.innerHTML = '<p style="color:var(--color-text-muted);text-align:center;padding:var(--space-xl)">暂无资源</p>';
+      return;
+    }
+
+    $resourceGrid.innerHTML = resources.map(r => {
+      let preview;
+      if (r.contentType && r.contentType.startsWith('image/')) {
+        preview = `<img class="resource-card__preview" src="${SharedUI.esc(r.url)}" alt="${SharedUI.esc(r.name)}">`;
+      } else if (r.contentType && r.contentType.startsWith('audio/')) {
+        preview = `<div class="resource-card__preview resource-card__preview--icon">🎵</div>`;
+      } else if (r.contentType && r.contentType.startsWith('video/')) {
+        preview = `<div class="resource-card__preview resource-card__preview--icon">🎬</div>`;
+      } else {
+        preview = `<div class="resource-card__preview resource-card__preview--icon">📄</div>`;
+      }
+
+      return `<div class="resource-card">
+        ${preview}
+        <div class="resource-card__name" title="${SharedUI.esc(r.name)}">${SharedUI.esc(r.name)}</div>
+        <button class="resource-card__delete" data-id="${r.id}" data-path="${SharedUI.esc(r.path || '')}" aria-label="删除资源">&times;</button>
+      </div>`;
+    }).join('');
+
+    // 删除按钮事件
+    $resourceGrid.querySelectorAll('.resource-card__delete').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const path = btn.dataset.path;
+        const ok = await UI.confirm('确认删除', '确定要删除该资源吗？');
+        if (!ok) return;
+        try {
+          await ResourceManager.remove(id, path);
+          UI.toast('资源已删除', 'success');
+        } catch (err) {
+          UI.toast('删除失败: ' + err.message, 'error');
+        }
+      });
+    });
+  }
+
+  Store.onResourcesChange(resources => renderResources(resources));
+
+  // 上传
+  $uploadArea.addEventListener('click', () => $fileInput.click());
+
+  $uploadArea.addEventListener('dragover', e => {
+    e.preventDefault();
+    $uploadArea.classList.add('upload-area--dragover');
+  });
+  $uploadArea.addEventListener('dragleave', () => {
+    $uploadArea.classList.remove('upload-area--dragover');
+  });
+  $uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    $uploadArea.classList.remove('upload-area--dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) handleUpload(files);
+  });
+
+  $fileInput.addEventListener('change', () => {
+    if ($fileInput.files.length > 0) handleUpload($fileInput.files);
+  });
+
+  async function handleUpload(fileList) {
+    const files = Array.from(fileList);
+    let successCount = 0;
+    let failCount = 0;
+
+    $uploadProgress.style.display = 'block';
+    $uploadStatus.textContent = '';
+
+    for (const file of files) {
+      try {
+        await ResourceManager.upload(file, pct => {
+          $uploadProgressBar.style.width = pct + '%';
+        });
+        successCount++;
+      } catch (err) {
+        console.error('上传失败:', file.name, err);
+        failCount++;
+      }
+    }
+
+    $uploadProgress.style.display = 'none';
+    $uploadProgressBar.style.width = '0%';
+    $fileInput.value = '';
+
+    if (successCount > 0) UI.toast(`成功上传 ${successCount} 个文件${failCount > 0 ? '，' + failCount + ' 个失败' : ''}`, 'success');
+    else if (failCount > 0) UI.toast('上传失败', 'error');
   }
 
   // ========== 工具 ==========

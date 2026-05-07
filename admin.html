@@ -4,13 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>指挥中心 — 管理员面板</title>
-  <link rel="stylesheet" href="css/common.css?v=34">
-  <link rel="stylesheet" href="css/admin.css?v=34">
+  <link rel="stylesheet" href="css/common.css?v=35">
+  <link rel="stylesheet" href="css/admin.css?v=35">
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -50,6 +51,7 @@
       <button class="admin-tab is-active" data-panel="tasks" role="tab">任务管理</button>
       <button class="admin-tab" data-panel="rewards" role="tab">奖励管理</button>
       <button class="admin-tab" data-panel="points" role="tab">积分配置</button>
+      <button class="admin-tab" data-panel="resources" role="tab">资源管理</button>
       <button class="admin-tab" data-panel="logs" role="tab">记录</button>
     </nav>
 
@@ -205,6 +207,29 @@
       </div>
     </div>
 
+    <!-- ===== 资源管理面板 ===== -->
+    <div class="admin-panel" id="panel-resources">
+      <div class="config-section">
+        <h3 class="config-section__title">上传资源</h3>
+        <div class="upload-area" id="uploadArea">
+          <input type="file" class="upload-area__input" id="fileInput" multiple accept="image/*,audio/*,video/*">
+          <div class="upload-area__icon" aria-hidden="true">+</div>
+          <p class="upload-area__text">点击或拖拽文件到此处上传</p>
+          <p class="upload-area__hint">支持图片、音频、视频文件</p>
+        </div>
+        <div class="upload-progress" id="uploadProgress" style="display:none">
+          <div class="upload-progress__bar" id="uploadProgressBar"></div>
+        </div>
+        <p class="upload-status" id="uploadStatus"></p>
+      </div>
+      <div class="config-section">
+        <h3 class="config-section__title">资源列表</h3>
+        <div class="resource-grid" id="resourceGrid">
+          <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-xl)">暂无资源</p>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== 积分配置面板 ===== -->
     <div class="admin-panel" id="panel-points">
       <div class="config-section">
@@ -339,17 +364,18 @@
   </div>
 
   <!-- JS 依赖（顺序加载） -->
-  <script src="js/firebase-config.js?v=34"></script>
-  <script src="js/app-config.js?v=34"></script>
-  <script src="js/store.js?v=34"></script>
-  <script src="js/points.js?v=34"></script>
-  <script src="js/tasks.js?v=34"></script>
-  <script src="js/rewards.js?v=34"></script>
-  <script src="js/streak.js?v=34"></script>
-  <script src="js/reports.js?v=34"></script>
-  <script src="js/shared-ui.js?v=34"></script>
-  <script src="js/ui.js?v=34"></script>
-  <script src="js/router.js?v=34"></script>
-  <script src="js/admin-app.js?v=34"></script>
+  <script src="js/firebase-config.js?v=35"></script>
+  <script src="js/app-config.js?v=35"></script>
+  <script src="js/store.js?v=35"></script>
+  <script src="js/points.js?v=35"></script>
+  <script src="js/tasks.js?v=35"></script>
+  <script src="js/rewards.js?v=35"></script>
+  <script src="js/streak.js?v=35"></script>
+  <script src="js/reports.js?v=35"></script>
+  <script src="js/shared-ui.js?v=35"></script>
+  <script src="js/ui.js?v=35"></script>
+  <script src="js/router.js?v=35"></script>
+  <script src="js/resource-manager.js?v=35"></script>
+  <script src="js/admin-app.js?v=35"></script>
 </body>
 </html>

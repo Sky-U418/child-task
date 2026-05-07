@@ -280,6 +280,28 @@ const Store = (() => {
     return db.runTransaction(updateFn);
   }
 
+  // ========== 资源管理 ==========
+  function getResources() {
+    return db.collection(C.COLL_RESOURCES).orderBy('uploadedAt', 'desc').get()
+      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
+
+  function onResourcesChange(callback) {
+    return db.collection(C.COLL_RESOURCES).orderBy('uploadedAt', 'desc')
+      .onSnapshot(snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }
+
+  function addResource(data) {
+    return db.collection(C.COLL_RESOURCES).add({
+      ...data,
+      uploadedAt: firebase.firestore.Timestamp.now()
+    });
+  }
+
+  function deleteResource(id) {
+    return db.collection(C.COLL_RESOURCES).doc(id).delete();
+  }
+
   function batchWrite(operations) {
     const batch = db.batch();
     operations.forEach(op => {
@@ -302,6 +324,7 @@ const Store = (() => {
     addExchangeLog, getExchangeLogs, getExchangeLogsByDateRange,
     addDeductionLog, getDeductionLogs, getDeductionLogsByDateRange,
     addTaskLog, getTaskLogs,
+    getResources, onResourcesChange, addResource, deleteResource,
     getAppConfig, updateAppConfig, setAppConfig, onAppConfigChange,
     runTransaction, batchWrite
   };

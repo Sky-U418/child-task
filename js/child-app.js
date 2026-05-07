@@ -163,21 +163,25 @@ document.addEventListener('firebase:ready', async () => {
       barPct = 0;
     } else {
       const posInCycle = ((current - 1) % 5) + 1;
+      const cycle = Math.floor((current - 1) / 5);
 
       if (current >= 15) {
         imgSrc = 'images/1c.png';
-        barColor = '#42a5f5';
-        barPct = 100;
       } else if (current >= 10) {
         imgSrc = 'images/1b.png';
-        barColor = '#ff9800';
-        barPct = posInCycle * 20;
       } else if (current >= 5) {
         imgSrc = 'images/1a.png';
-        barColor = '#ffe082';
-        barPct = posInCycle * 20;
       } else {
         imgSrc = 'images/0.png';
+      }
+
+      if (cycle >= 2) {
+        barColor = '#42a5f5';
+        barPct = current >= 15 ? 100 : posInCycle * 20;
+      } else if (cycle === 1) {
+        barColor = '#ff9800';
+        barPct = posInCycle * 20;
+      } else {
         barColor = '#ffe082';
         barPct = posInCycle * 20;
       }

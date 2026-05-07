@@ -89,6 +89,7 @@ document.addEventListener('firebase:ready', async () => {
   Store.onStreakChange(uid, s => {
     streak = s;
     updateStreakDisplay();
+    renderTasks();
   });
 
   // 加载兑换记录（一次性）
@@ -221,7 +222,7 @@ document.addEventListener('firebase:ready', async () => {
         <div class="task-card ${statusClass}" data-task-id="${t.id}">
           <div class="task-card__header">
             <span class="task-card__title">${SharedUI.esc(t.title)}</span>
-            <span class="task-card__points">+${t.points}</span>
+            <span class="task-card__points">+${(t.type === 'daily' && streak) ? Math.round(t.points * StreakManager.getTodayMultiplier(streak)) : t.points}</span>
           </div>
           ${t.description ? `<p class="task-card__desc">${SharedUI.esc(t.description)}</p>` : ''}
           <div class="task-card__footer">

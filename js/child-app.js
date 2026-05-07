@@ -17,7 +17,8 @@ document.addEventListener('firebase:ready', async () => {
   // Streak
   const $streakDays = document.getElementById('streakDays');
   const $streakMultiplier = document.getElementById('streakMultiplier');
-  const $streakFlame = document.getElementById('streakFlame');
+  const $streakImg = document.getElementById('streakImg');
+  const $streakProgressBar = document.getElementById('streakProgressBar');
   const $profileStreak = document.getElementById('profileStreak');
   const $profileMaxStreak = document.getElementById('profileMaxStreak');
   const $profileMultiplier = document.getElementById('profileMultiplier');
@@ -145,25 +146,46 @@ document.addEventListener('firebase:ready', async () => {
 
   function updateStreakDisplay() {
     if (!streak) return;
-    $streakDays.textContent = streak.currentStreak || 0;
-    $streakMultiplier.textContent = StreakManager.getTodayMultiplier(streak).toFixed(1) + 'x';
-    $profileStreak.textContent = streak.currentStreak || 0;
-    $profileMaxStreak.textContent = streak.maxStreak || 0;
-    $profileMultiplier.textContent = StreakManager.getTodayMultiplier(streak).toFixed(1) + 'x';
+    const current = streak.currentStreak || 0;
+    const mult = StreakManager.getTodayMultiplier(streak);
 
-    // 火焰动画
-    if (streak.currentStreak > 0) {
-      $streakFlame.classList.add('is-active');
-      // 根据天数选火焰
-      const flames = ['🔥', '🔥', '🔥', '🔥', '🔥', '🔥', '🔥'];
-      if (streak.currentStreak >= 30) $streakFlame.textContent = '🔥';
-      else if (streak.currentStreak >= 14) $streakFlame.textContent = '🔥';
-      else if (streak.currentStreak >= 7) $streakFlame.textContent = '🔥';
-      else $streakFlame.textContent = '🔥';
+    $streakDays.textContent = current;
+    $streakMultiplier.textContent = mult.toFixed(1) + 'x';
+    $profileStreak.textContent = current;
+    $profileMaxStreak.textContent = streak.maxStreak || 0;
+    $profileMultiplier.textContent = mult.toFixed(1) + 'x';
+
+    // 徽章图片与进度条
+    let imgSrc, barColor, barPct;
+    if (current === 0) {
+      imgSrc = 'images/0.png';
+      barColor = '#444';
+      barPct = 0;
     } else {
-      $streakFlame.classList.remove('is-active');
-      $streakFlame.textContent = '🕯️';
+      const posInCycle = ((current - 1) % 5) + 1;
+
+      if (current >= 15) {
+        imgSrc = 'images/1c.png';
+        barColor = '#42a5f5';
+        barPct = 100;
+      } else if (current >= 10) {
+        imgSrc = 'images/1b.png';
+        barColor = '#ff9800';
+        barPct = posInCycle * 20;
+      } else if (current >= 5) {
+        imgSrc = 'images/1a.png';
+        barColor = '#ffe082';
+        barPct = posInCycle * 20;
+      } else {
+        imgSrc = 'images/0.png';
+        barColor = '#ffe082';
+        barPct = posInCycle * 20;
+      }
     }
+
+    $streakImg.src = imgSrc;
+    $streakProgressBar.style.width = barPct + '%';
+    $streakProgressBar.style.backgroundColor = barColor;
   }
 
   // ========== 任务渲染 ==========

@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>宇航员看板 — 任务积分</title>
-  <link rel="stylesheet" href="css/common.css?v=29">
-  <link rel="stylesheet" href="css/child.css?v=29">
+  <link rel="stylesheet" href="css/common.css?v=30">
+  <link rel="stylesheet" href="css/child.css?v=30">
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
@@ -17,19 +17,26 @@
   <div class="child-layout">
     <!-- ===== 顶部状态栏 ===== -->
     <section class="status-bar" aria-label="积分状态">
-      <!-- 可用积分 — 顶部大数字 -->
-      <div class="points-total-banner">
-        <div class="points-total-banner__value" id="totalPoints">0</div>
-        <div class="points-total-banner__label">可用积分</div>
+      <!-- 打卡显示 — 顶部横幅 -->
+      <div class="streak-banner">
+        <img class="streak-banner__img" id="streakImg" src="images/0.png" alt="打卡徽章" width="80" height="80">
+        <div class="streak-banner__info">
+          <div class="streak-banner__label">连续打卡</div>
+          <div class="streak-banner__count" id="streakDays">0</div>
+          <div class="streak-banner__progress-row">
+            <div class="streak-progress">
+              <div class="streak-progress__bar" id="streakProgressBar"></div>
+            </div>
+            <span class="streak-banner__multiplier" id="streakMultiplier">1.0x</span>
+          </div>
+        </div>
       </div>
 
-      <!-- 三栏状态盒子 — 等高对齐 -->
+      <!-- 三栏积分盒子 -->
       <div class="status-boxes">
-        <div class="status-box status-box--streak" id="streakDisplay">
-          <div class="streak-flame" id="streakFlame" aria-label="连续打卡火焰">🔥</div>
-          <div class="streak-days" id="streakDays">0</div>
-          <div class="streak-label">连续打卡</div>
-          <div class="streak-multiplier" id="streakMultiplier">1.0x</div>
+        <div class="status-box status-box--total">
+          <div class="status-box__value" id="totalPoints">0</div>
+          <div class="status-box__label">可用积分</div>
         </div>
 
         <div class="status-box status-box--base">
@@ -164,17 +171,17 @@
   </div>
 
   <!-- JS 依赖（顺序加载） -->
-  <script src="js/firebase-config.js?v=29"></script>
-  <script src="js/app-config.js?v=29"></script>
-  <script src="js/store.js?v=29"></script>
-  <script src="js/points.js?v=29"></script>
-  <script src="js/tasks.js?v=29"></script>
-  <script src="js/rewards.js?v=29"></script>
-  <script src="js/streak.js?v=29"></script>
-  <script src="js/reports.js?v=29"></script>
-  <script src="js/shared-ui.js?v=29"></script>
-  <script src="js/ui.js?v=29"></script>
-  <script src="js/animations.js?v=29"></script>
-  <script src="js/child-app.js?v=29"></script>
+  <script src="js/firebase-config.js?v=30"></script>
+  <script src="js/app-config.js?v=30"></script>
+  <script src="js/store.js?v=30"></script>
+  <script src="js/points.js?v=30"></script>
+  <script src="js/tasks.js?v=30"></script>
+  <script src="js/rewards.js?v=30"></script>
+  <script src="js/streak.js?v=30"></script>
+  <script src="js/reports.js?v=30"></script>
+  <script src="js/shared-ui.js?v=30"></script>
+  <script src="js/ui.js?v=30"></script>
+  <script src="js/animations.js?v=30"></script>
+  <script src="js/child-app.js?v=30"></script>
 </body>
 </html>

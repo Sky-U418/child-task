@@ -302,6 +302,33 @@ const Store = (() => {
     return db.collection(C.COLL_RESOURCES).doc(id).delete();
   }
 
+  // ========== 黑板 ==========
+
+  const BLACKBOARD_DOC_ID = 'singleton';
+
+  function getBlackboard() {
+    return db.collection(C.COLL_BLACKBOARD).doc(BLACKBOARD_DOC_ID).get()
+      .then(doc => doc.exists ? doc.data() : { contentType: null, textContent: '', resourceId: '', resourceName: '', resourceUrl: '', resourceContentType: '' });
+  }
+
+  function onBlackboardChange(callback) {
+    return db.collection(C.COLL_BLACKBOARD).doc(BLACKBOARD_DOC_ID)
+      .onSnapshot(doc => {
+        if (doc.exists) {
+          callback(doc.data());
+        } else {
+          callback({ contentType: null, textContent: '', resourceId: '', resourceName: '', resourceUrl: '', resourceContentType: '' });
+        }
+      });
+  }
+
+  function setBlackboard(data) {
+    return db.collection(C.COLL_BLACKBOARD).doc(BLACKBOARD_DOC_ID).set({
+      ...data,
+      updatedAt: firebase.firestore.Timestamp.now()
+    }, { merge: true });
+  }
+
   function batchWrite(operations) {
     const batch = db.batch();
     operations.forEach(op => {
@@ -325,6 +352,7 @@ const Store = (() => {
     addDeductionLog, getDeductionLogs, getDeductionLogsByDateRange,
     addTaskLog, getTaskLogs,
     getResources, onResourcesChange, addResource, deleteResource,
+    getBlackboard, onBlackboardChange, setBlackboard,
     getAppConfig, updateAppConfig, setAppConfig, onAppConfigChange,
     runTransaction, batchWrite
   };

@@ -88,6 +88,12 @@ document.addEventListener('firebase:ready', () => {
   const $btnAddResource = document.getElementById('btnAddResource');
   const $resourceGrid = document.getElementById('resourceGrid');
 
+  // Blackboard
+  const $bbStatus = document.getElementById('bbStatus');
+  const $bbText = document.getElementById('bbText');
+  const $btnBBPushText = document.getElementById('btnBBPushText');
+  const $btnBBClear = document.getElementById('btnBBClear');
+
   // Reports
   const $adminWeeklyCards = document.getElementById('adminWeeklyCards');
   const $adminMonthlyCard = document.getElementById('adminMonthlyCard');
@@ -372,6 +378,9 @@ document.addEventListener('firebase:ready', () => {
       loadAdminExchangeLogs();
       UI.toast('显示已清空', 'info');
     });
+
+    // 黑板状态监听
+    Store.onBlackboardChange(data => updateBBStatus(data));
   }
 
   // ========== Tab 切换 ==========
@@ -1064,6 +1073,7 @@ document.addEventListener('firebase:ready', () => {
       return `<div class="resource-card">
         ${preview}
         <div class="resource-card__name" title="${SharedUI.esc(r.name)}">${SharedUI.esc(r.name)}</div>
+        <button class="resource-card__push" data-action="pushToBB" data-id="${r.id}" data-name="${SharedUI.esc(r.name)}" data-url="${SharedUI.esc(r.url)}" data-type="${SharedUI.esc(r.contentType || '')}" aria-label="推送到黑板">📌</button>
         <button class="resource-card__delete" data-id="${r.id}" aria-label="删除资源">&times;</button>
       </div>`;
     }).join('');
@@ -1084,6 +1094,78 @@ document.addEventListener('firebase:ready', () => {
   }
 
   Store.onResourcesChange(resources => renderResources(resources));
+
+  // 资源卡片事件委托（推送 + 删除）
+  $resourceGrid.addEventListener('click', async (e) => {
+    const pushBtn = e.target.closest('.resource-card__push');
+    if (pushBtn) {
+      const id = pushBtn.dataset.id;
+      const name = pushBtn.dataset.name;
+      const url = pushBtn.dataset.url;
+      const type = pushBtn.dataset.type;
+      try {
+        await Store.setBlackboard({
+          contentType: 'resource',
+          resourceId: id,
+          resourceName: name,
+          resourceUrl: url,
+          resourceContentType: type
+        });
+        UI.toast('已推送到黑板', 'success');
+      } catch (err) {
+        UI.toast('推送失败: ' + err.message, 'error');
+      }
+      return;
+    }
+  });
+
+  // 文字推送
+  $btnBBPushText.addEventListener('click', async () => {
+    const text = $bbText.value.trim();
+    if (!text) { UI.toast('请输入文字内容', 'error'); return; }
+    try {
+      await Store.setBlackboard({
+        contentType: 'text',
+        textContent: text,
+        resourceId: '',
+        resourceName: '',
+        resourceUrl: '',
+        resourceContentType: ''
+      });
+      UI.toast('文字已推送到黑板', 'success');
+    } catch (err) {
+      UI.toast('推送失败: ' + err.message, 'error');
+    }
+  });
+
+  // 清空黑板
+  $btnBBClear.addEventListener('click', async () => {
+    try {
+      await Store.setBlackboard({
+        contentType: null,
+        textContent: '',
+        resourceId: '',
+        resourceName: '',
+        resourceUrl: '',
+        resourceContentType: ''
+      });
+      UI.toast('黑板已清空', 'info');
+    } catch (err) {
+      UI.toast('清空失败: ' + err.message, 'error');
+    }
+  });
+
+  function updateBBStatus(data) {
+    const ct = data && data.contentType ? data.contentType : null;
+    if (!ct) {
+      $bbStatus.innerHTML = '当前：<span style="color:var(--color-text-muted)">空</span>';
+    } else if (ct === 'text') {
+      const preview = (data.textContent || '').substring(0, 20);
+      $bbStatus.innerHTML = '当前：文字 <span class="bb-status__accent">「' + SharedUI.esc(preview) + (data.textContent && data.textContent.length > 20 ? '…' : '') + '」</span>';
+    } else if (ct === 'resource') {
+      $bbStatus.innerHTML = '当前：资源 <span class="bb-status__accent">「' + SharedUI.esc(data.resourceName || '未命名') + '」</span>';
+    }
+  }
 
   $btnAddResource.addEventListener('click', async () => {
     const url = $resUrl.value.trim();

@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>指挥中心 — 管理员面板</title>
-  <link rel="stylesheet" href="css/common.css?v=39">
-  <link rel="stylesheet" href="css/admin.css?v=39">
+  <link rel="stylesheet" href="css/common.css?v=40">
+  <link rel="stylesheet" href="css/admin.css?v=40">
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
@@ -209,6 +209,33 @@
 
     <!-- ===== 资源管理面板 ===== -->
     <div class="admin-panel" id="panel-resources">
+      <!-- 小黑板推送 -->
+      <div class="config-section">
+        <h3 class="config-section__title">小黑板推送</h3>
+        <p class="bb-status" id="bbStatus">当前：空</p>
+
+        <div class="form-group">
+          <label class="form-label" for="bbText">文字推送</label>
+          <textarea class="form-textarea" id="bbText" placeholder="输入要显示在小黑板上的文字..." rows="3" maxlength="500"></textarea>
+        </div>
+        <div class="form-actions" style="justify-content:flex-start;margin-top:var(--space-sm)">
+          <button class="btn btn--primary" id="btnBBPushText">推送文字</button>
+        </div>
+
+        <hr style="border-color:var(--color-border);margin:var(--space-md) 0">
+
+        <label class="form-label">资源推送</label>
+        <p style="font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:var(--space-sm)">
+          点击资源卡片上的 <span style="color:var(--color-accent)">📌</span> 按钮推送到黑板
+        </p>
+
+        <hr style="border-color:var(--color-border);margin:var(--space-md) 0">
+
+        <div class="form-actions" style="justify-content:flex-start">
+          <button class="btn btn--danger" id="btnBBClear">清空黑板</button>
+        </div>
+      </div>
+
       <div class="config-section">
         <h3 class="config-section__title">添加外部资源</h3>
         <div class="form-group">
@@ -376,18 +403,18 @@
   </div>
 
   <!-- JS 依赖（顺序加载） -->
-  <script src="js/firebase-config.js?v=39"></script>
-  <script src="js/app-config.js?v=39"></script>
-  <script src="js/store.js?v=39"></script>
-  <script src="js/points.js?v=39"></script>
-  <script src="js/tasks.js?v=39"></script>
-  <script src="js/rewards.js?v=39"></script>
-  <script src="js/streak.js?v=39"></script>
-  <script src="js/reports.js?v=39"></script>
-  <script src="js/shared-ui.js?v=39"></script>
-  <script src="js/ui.js?v=39"></script>
-  <script src="js/router.js?v=39"></script>
-  <script src="js/resource-manager.js?v=39"></script>
-  <script src="js/admin-app.js?v=39"></script>
+  <script src="js/firebase-config.js?v=40"></script>
+  <script src="js/app-config.js?v=40"></script>
+  <script src="js/store.js?v=40"></script>
+  <script src="js/points.js?v=40"></script>
+  <script src="js/tasks.js?v=40"></script>
+  <script src="js/rewards.js?v=40"></script>
+  <script src="js/streak.js?v=40"></script>
+  <script src="js/reports.js?v=40"></script>
+  <script src="js/shared-ui.js?v=40"></script>
+  <script src="js/ui.js?v=40"></script>
+  <script src="js/router.js?v=40"></script>
+  <script src="js/resource-manager.js?v=40"></script>
+  <script src="js/admin-app.js?v=40"></script>
 </body>
 </html>

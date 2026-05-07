@@ -51,6 +51,17 @@ document.addEventListener('firebase:ready', async () => {
   const $logCollapseArrow = document.getElementById('logCollapseArrow');
   const $btnClearLogs = document.getElementById('btnClearLogs');
 
+  // Blackboard
+  const $blackboardEmpty = document.getElementById('blackboardEmpty');
+  const $blackboardText = document.getElementById('blackboardText');
+  const $blackboardTextContent = document.getElementById('blackboardTextContent');
+  const $blackboardResource = document.getElementById('blackboardResource');
+  const $blackboardImg = document.getElementById('blackboardImg');
+  const $blackboardVideo = document.getElementById('blackboardVideo');
+  const $blackboardAudio = document.getElementById('blackboardAudio');
+  const $blackboardOther = document.getElementById('blackboardOther');
+  const $blackboardOtherName = document.getElementById('blackboardOtherName');
+
   function _getLogHiddenBefore() {
     return parseInt(localStorage.getItem('exchangeLogHiddenBefore') || '0', 10);
   }
@@ -95,6 +106,11 @@ document.addEventListener('firebase:ready', async () => {
 
   // 加载兑换记录（一次性）
   loadExchangeLogs();
+
+  // 小黑板实时监听
+  Store.onBlackboardChange(renderBlackboard);
+
+  // 窗口 resize 时重新计算黑板文字字号
 
   // 定时重新渲染（处理不刷新页面的过期清理）
   setInterval(() => {
@@ -191,6 +207,78 @@ document.addEventListener('firebase:ready', async () => {
     $streakProgressBar.style.width = barPct + '%';
     $streakProgressBar.style.backgroundColor = barColor;
   }
+
+  // ========== 小黑板渲染 ==========
+
+  function renderBlackboard(data) {
+    const ct = data && data.contentType ? data.contentType : null;
+
+    // 隐藏所有
+    $blackboardEmpty.style.display = 'none';
+    $blackboardText.style.display = 'none';
+    $blackboardResource.style.display = 'none';
+
+    if (!ct) {
+      $blackboardEmpty.style.display = '';
+      return;
+    }
+
+    if (ct === 'text' && data.textContent) {
+      $blackboardTextContent.textContent = data.textContent;
+      $blackboardText.style.display = '';
+      fitBlackboardText();
+    } else if (ct === 'resource') {
+      $blackboardResource.style.display = '';
+      $blackboardImg.style.display = 'none';
+      $blackboardVideo.style.display = 'none';
+      $blackboardAudio.style.display = 'none';
+      $blackboardOther.style.display = 'none';
+
+      const rct = data.resourceContentType || '';
+      if (rct.startsWith('image/')) {
+        $blackboardImg.src = data.resourceUrl || '';
+        $blackboardImg.style.display = '';
+      } else if (rct.startsWith('video/')) {
+        $blackboardVideo.src = data.resourceUrl || '';
+        $blackboardVideo.style.display = '';
+      } else if (rct.startsWith('audio/')) {
+        $blackboardAudio.src = data.resourceUrl || '';
+        $blackboardAudio.style.display = '';
+      } else {
+        $blackboardOtherName.textContent = data.resourceName || '未知资源';
+        $blackboardOther.style.display = '';
+      }
+    }
+  }
+
+  function fitBlackboardText() {
+    const frame = document.querySelector('.blackboard-frame');
+    const span = $blackboardTextContent;
+    if (!frame || !span) return;
+
+    span.style.fontSize = '';
+    const maxW = frame.clientWidth - 32;
+    const maxH = frame.clientHeight - 32;
+
+    let lo = 16, hi = 120, best = 16;
+    while (lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      span.style.fontSize = mid + 'px';
+      if (span.scrollWidth <= maxW && span.scrollHeight <= maxH) {
+        best = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    span.style.fontSize = best + 'px';
+  }
+
+  window.addEventListener('resize', () => {
+    if ($blackboardText.style.display !== 'none') {
+      fitBlackboardText();
+    }
+  });
 
   // ========== 任务渲染 ==========
 

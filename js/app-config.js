@@ -23,6 +23,7 @@ const APP_CONFIG = Object.freeze({
   COLL_TASK_LOG: 'taskLog',
   COLL_DEDUCTION_LOG: 'deductionLog',
   COLL_RESOURCES: 'resources',
+  COLL_BLACKBOARD: 'blackboard',
   COLL_APP_CONFIG: 'appConfig',
 
   // 任务类型

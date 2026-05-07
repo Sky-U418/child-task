@@ -762,6 +762,69 @@
   color: var(--color-danger);
 }
 
+/* ----- 小黑板 ----- */
+.blackboard-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #1a1a2e;
+  border: 2px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.blackboard-empty {
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.blackboard-text {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  box-sizing: border-box;
+}
+
+.blackboard-text span {
+  display: block;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
+  color: #e0e6f0;
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.blackboard-resource {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.blackboard-resource img,
+.blackboard-resource video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.blackboard-resource audio {
+  max-width: 90%;
+}
+
+.blackboard-resource__other {
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
 /* ----- 响应式 ----- */
 @media (min-width: 768px) {
   .task-grid {

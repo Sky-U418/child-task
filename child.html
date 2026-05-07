@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>宇航员看板 — 任务积分</title>
-  <link rel="stylesheet" href="css/common.css?v=31">
-  <link rel="stylesheet" href="css/child.css?v=31">
+  <link rel="stylesheet" href="css/common.css?v=32">
+  <link rel="stylesheet" href="css/child.css?v=32">
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
@@ -74,6 +74,17 @@
         </span>
         <span>兑换商店</span>
       </button>
+      <button class="nav-tab" data-panel="blackboard" role="tab" aria-selected="false">
+        <span class="nav-tab__icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="3" width="16" height="12" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <line x1="2" y1="15" x2="18" y2="15" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="10" y1="15" x2="10" y2="18" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="6" y1="18" x2="14" y2="18" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </span>
+        <span>小黑板</span>
+      </button>
       <button class="nav-tab" data-panel="profile" role="tab" aria-selected="false">
         <span class="nav-tab__icon" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -101,6 +112,28 @@
         <div class="empty-state">
           <div class="empty-state__icon">🎁</div>
           <p class="empty-state__text">暂无奖励，等待指挥官设置...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 小黑板面板 ===== -->
+    <section class="child-panel" id="panel-blackboard" role="tabpanel" aria-label="小黑板">
+      <div class="blackboard-frame">
+        <div class="blackboard-empty" id="blackboardEmpty">
+          <div class="empty-state__icon">📋</div>
+          <p class="empty-state__text">等待指挥官推送内容...</p>
+        </div>
+        <div class="blackboard-text" id="blackboardText" style="display:none">
+          <span id="blackboardTextContent"></span>
+        </div>
+        <div class="blackboard-resource" id="blackboardResource" style="display:none">
+          <img id="blackboardImg" src="" alt="" style="display:none">
+          <video id="blackboardVideo" controls playsinline style="display:none"></video>
+          <audio id="blackboardAudio" controls style="display:none"></audio>
+          <div class="blackboard-resource__other" id="blackboardOther" style="display:none">
+            <div class="empty-state__icon">📄</div>
+            <p class="empty-state__text" id="blackboardOtherName"></p>
+          </div>
         </div>
       </div>
     </section>
@@ -171,17 +204,17 @@
   </div>
 
   <!-- JS 依赖（顺序加载） -->
-  <script src="js/firebase-config.js?v=31"></script>
-  <script src="js/app-config.js?v=31"></script>
-  <script src="js/store.js?v=31"></script>
-  <script src="js/points.js?v=31"></script>
-  <script src="js/tasks.js?v=31"></script>
-  <script src="js/rewards.js?v=31"></script>
-  <script src="js/streak.js?v=31"></script>
-  <script src="js/reports.js?v=31"></script>
-  <script src="js/shared-ui.js?v=31"></script>
-  <script src="js/ui.js?v=31"></script>
-  <script src="js/animations.js?v=31"></script>
-  <script src="js/child-app.js?v=31"></script>
+  <script src="js/firebase-config.js?v=32"></script>
+  <script src="js/app-config.js?v=32"></script>
+  <script src="js/store.js?v=32"></script>
+  <script src="js/points.js?v=32"></script>
+  <script src="js/tasks.js?v=32"></script>
+  <script src="js/rewards.js?v=32"></script>
+  <script src="js/streak.js?v=32"></script>
+  <script src="js/reports.js?v=32"></script>
+  <script src="js/shared-ui.js?v=32"></script>
+  <script src="js/ui.js?v=32"></script>
+  <script src="js/animations.js?v=32"></script>
+  <script src="js/child-app.js?v=32"></script>
 </body>
 </html>

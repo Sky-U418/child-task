@@ -29,7 +29,7 @@
 /* 三栏积分盒子 — 等高 */
 .status-boxes {
   display: flex;
-  gap: var(--space-sm);
+  gap: 4px;
   align-items: stretch;
 }
 
@@ -40,7 +40,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-xs);
+  padding: 8px 2px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.02);
@@ -64,7 +64,7 @@
 
 .status-box__value {
   font-family: var(--font-display);
-  font-size: 1.75rem;
+  font-size: 1.125rem;
   font-weight: 800;
   line-height: 1;
 }

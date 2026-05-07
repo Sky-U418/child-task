@@ -825,6 +825,46 @@
   color: var(--color-text-muted);
 }
 
+.blackboard-youtube {
+  width: 100%;
+  height: 100%;
+}
+
+.blackboard-youtube iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.blackboard-ext-link {
+  text-align: center;
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+}
+
+.blackboard-ext-link__icon {
+  font-size: 2.5rem;
+}
+
+.blackboard-ext-link__name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blackboard-ext-link__hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
 /* ----- 响应式 ----- */
 @media (min-width: 768px) {
   .task-grid {

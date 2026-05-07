@@ -61,6 +61,11 @@ document.addEventListener('firebase:ready', async () => {
   const $blackboardAudio = document.getElementById('blackboardAudio');
   const $blackboardOther = document.getElementById('blackboardOther');
   const $blackboardOtherName = document.getElementById('blackboardOtherName');
+  const $blackboardYoutube = document.getElementById('blackboardYoutube');
+  const $blackboardYoutubeIframe = document.getElementById('blackboardYoutubeIframe');
+  const $blackboardExtLink = document.getElementById('blackboardExtLink');
+  const $blackboardExtLinkName = document.getElementById('blackboardExtLinkName');
+  const $blackboardExtLinkBtn = document.getElementById('blackboardExtLinkBtn');
 
   function _getLogHiddenBefore() {
     return parseInt(localStorage.getItem('exchangeLogHiddenBefore') || '0', 10);
@@ -208,6 +213,21 @@ document.addEventListener('firebase:ready', async () => {
     $streakProgressBar.style.backgroundColor = barColor;
   }
 
+  // ========== 小黑板工具函数 ==========
+
+  function isYouTubeUrl(url) {
+    return /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)/.test(url);
+  }
+
+  function getYouTubeEmbedUrl(url) {
+    const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+    return m ? 'https://www.youtube.com/embed/' + m[1] + '?autoplay=1&rel=0' : url;
+  }
+
+  function isNonEmbeddableUrl(url) {
+    return /drive\.google\.com|1drv\.ms|onedrive\.live\.com/.test(url);
+  }
+
   // ========== 小黑板渲染 ==========
 
   function renderBlackboard(data) {
@@ -233,17 +253,43 @@ document.addEventListener('firebase:ready', async () => {
       $blackboardVideo.style.display = 'none';
       $blackboardAudio.style.display = 'none';
       $blackboardOther.style.display = 'none';
+      $blackboardYoutube.style.display = 'none';
+      $blackboardExtLink.style.display = 'none';
+      $blackboardYoutubeIframe.src = '';
 
       const rct = data.resourceContentType || '';
+      const url = data.resourceUrl || '';
+
       if (rct.startsWith('image/')) {
-        $blackboardImg.src = data.resourceUrl || '';
+        $blackboardImg.src = url;
         $blackboardImg.style.display = '';
       } else if (rct.startsWith('video/')) {
-        $blackboardVideo.src = data.resourceUrl || '';
-        $blackboardVideo.style.display = '';
+        if (isYouTubeUrl(url)) {
+          $blackboardYoutubeIframe.src = getYouTubeEmbedUrl(url);
+          $blackboardYoutube.style.display = '';
+        } else if (isNonEmbeddableUrl(url)) {
+          $blackboardExtLinkName.textContent = data.resourceName || '视频资源';
+          $blackboardExtLinkBtn.href = url;
+          $blackboardExtLink.style.display = '';
+        } else {
+          $blackboardVideo.src = url;
+          $blackboardVideo.onerror = () => {
+            $blackboardVideo.style.display = 'none';
+            $blackboardExtLinkName.textContent = data.resourceName || '视频资源';
+            $blackboardExtLinkBtn.href = url;
+            $blackboardExtLink.style.display = '';
+          };
+          $blackboardVideo.style.display = '';
+        }
       } else if (rct.startsWith('audio/')) {
-        $blackboardAudio.src = data.resourceUrl || '';
-        $blackboardAudio.style.display = '';
+        if (isNonEmbeddableUrl(url)) {
+          $blackboardExtLinkName.textContent = data.resourceName || '音频资源';
+          $blackboardExtLinkBtn.href = url;
+          $blackboardExtLink.style.display = '';
+        } else {
+          $blackboardAudio.src = url;
+          $blackboardAudio.style.display = '';
+        }
       } else {
         $blackboardOtherName.textContent = data.resourceName || '未知资源';
         $blackboardOther.style.display = '';

@@ -492,7 +492,12 @@ document.addEventListener('firebase:ready', () => {
         const fresh = await Store.getTasks();
         const dailies = fresh.filter(t => t.type === C.TASK_TYPE_DAILY);
         if (dailies.length > 0 && dailies.every(t => t.status === C.TASK_STATUS_COMPLETED || t.status === C.TASK_STATUS_CLOSED)) {
-          await StreakManager.onTaskCompleted(window._uid);
+          try {
+            await StreakManager.onTaskCompleted(window._uid);
+          } catch (err) {
+            console.error('打卡更新失败:', err);
+            UI.toast('任务已标记完成，但打卡记录更新失败: ' + err.message, 'error');
+          }
         }
       }
       UI.toast('任务已标记为完成', 'success');

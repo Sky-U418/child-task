@@ -502,10 +502,8 @@ document.addEventListener('firebase:ready', () => {
       }
       UI.toast('任务已标记为完成', 'success');
     } else if (action === 'close') {
-      const now = firebase.firestore.Timestamp.now();
       await Store.updateTask(id, {
-        status: C.TASK_STATUS_CLOSED,
-        graceExpiresAt: new firebase.firestore.Timestamp(now.seconds + 86400, 0)
+        status: C.TASK_STATUS_CLOSED
       });
       UI.toast('任务已关闭', 'info');
     } else if (action === 'reset') {

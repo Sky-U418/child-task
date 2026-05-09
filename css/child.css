@@ -249,6 +249,21 @@
 .task-card--completed::before { background: var(--color-success); }
 .task-card--closed::before { background: var(--color-text-muted); }
 
+.task-card--expired {
+  opacity: 0.55;
+}
+.task-card--expired::before {
+  background: var(--color-text-muted);
+}
+.task-card--expired .task-card__title,
+.task-card--expired .task-card__points {
+  color: var(--color-text-muted);
+  text-shadow: none;
+}
+.task-card--expired .task-card__timer {
+  color: var(--color-danger);
+}
+
 .task-card--in_progress {
   border-color: var(--color-warning);
   box-shadow: 0 0 16px var(--color-warning-glow);

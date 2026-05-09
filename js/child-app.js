@@ -365,12 +365,15 @@ document.addEventListener('firebase:ready', async () => {
     }
 
     $taskGrid.innerHTML = activeTasks.map(t => {
-      const statusClass = 'task-card--' + t.status;
+      const isExpired = t.status === 'closed' && t.graceExpiresAt;
+      const effectiveStatus = isExpired ? 'expired' : t.status;
+      const statusClass = 'task-card--' + effectiveStatus;
       const statusLabel = {
         available: '可领取',
         in_progress: '进行中',
-        completed: '任务完成！'
-      }[t.status] || '';
+        completed: '任务完成！',
+        expired: '已过期'
+      }[effectiveStatus] || '';
       const typeLabel = t.type === 'daily' ? '每日' : '限时';
 
       let timerHTML = '';

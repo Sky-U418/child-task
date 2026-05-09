@@ -503,7 +503,8 @@ document.addEventListener('firebase:ready', () => {
       UI.toast('任务已标记为完成', 'success');
     } else if (action === 'close') {
       await Store.updateTask(id, {
-        status: C.TASK_STATUS_CLOSED
+        status: C.TASK_STATUS_CLOSED,
+        graceExpiresAt: null
       });
       UI.toast('任务已关闭', 'info');
     } else if (action === 'reset') {

@@ -391,7 +391,11 @@ document.addEventListener('firebase:ready', async () => {
 
       let actionBtn = '';
       if (t.status === C.TASK_STATUS_AVAILABLE) {
-        actionBtn = `<button class="btn btn--primary btn--sm" data-action="accept" data-id="${t.id}">接受任务</button>`;
+        if (t.type === 'timed' && t.deadline && t.deadline.toDate().getTime() <= Date.now()) {
+          actionBtn = `<button class="btn btn--ghost btn--sm" disabled>已过期</button>`;
+        } else {
+          actionBtn = `<button class="btn btn--primary btn--sm" data-action="accept" data-id="${t.id}">接受任务</button>`;
+        }
       } else if (t.status === C.TASK_STATUS_COMPLETED) {
         const mult = (t.type === 'daily' && streak) ? StreakManager.getTodayMultiplier(streak) : 1.0;
         const earned = Math.round(t.points * mult);

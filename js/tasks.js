@@ -57,9 +57,23 @@ const TaskManager = (() => {
 
   // ========== 孩子操作 ==========
 
-  /** 领取任务 (available → in_progress) */
+  /** 领取任务 (available → in_progress) — 事务校验 deadline */
   async function acceptTask(taskId) {
-    return Store.updateTask(taskId, { status: C.TASK_STATUS_IN_PROGRESS });
+    return Store.runTransaction(async transaction => {
+      const taskRef = db.collection(C.COLL_TASKS).doc(taskId);
+      const taskDoc = await transaction.get(taskRef);
+      if (!taskDoc.exists) throw new Error('任务不存在');
+      const task = taskDoc.data();
+      if (task.status !== C.TASK_STATUS_AVAILABLE) throw new Error('任务不可领取');
+      // 限时任务已过 deadline 则拒绝
+      if (task.type === C.TASK_TYPE_TIMED && task.deadline) {
+        const now = firebase.firestore.Timestamp.now();
+        if (task.deadline.toMillis() <= now.toMillis()) {
+          throw new Error('任务已过期');
+        }
+      }
+      transaction.update(taskRef, { status: C.TASK_STATUS_IN_PROGRESS });
+    });
   }
 
   /** 孩子获取任务积分 (completed → closed) — 事务保证原子性 */

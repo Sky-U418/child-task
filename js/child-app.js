@@ -533,7 +533,7 @@ document.addEventListener('firebase:ready', async () => {
         '<input type="text" class="blackboard-quiz__fill-input" id="quizFillInput" placeholder="输入答案..." maxlength="200">' +
       '</div>';
     } else if (type === 'read') {
-      html += '<button class="btn btn--primary btn--sm" id="btnReadDone" style="margin-top:var(--space-md)">朗读完成</button>';
+      html += '<div style="text-align:right;margin-top:var(--space-md)"><button class="btn btn--primary btn--sm" id="btnReadDone">朗读完成</button></div>';
     }
     return html;
   }

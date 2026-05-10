@@ -1054,12 +1054,18 @@
   border-color: var(--color-primary);
 }
 
-/* 朗读题提示 */
-.blackboard-quiz__read-hint {
+/* 朗读题内容区 — 居中大字体，自动适应 */
+.blackboard-quiz__read-content {
   text-align: center;
-  padding: var(--space-lg);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: var(--space-md) var(--space-sm);
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+  word-break: break-word;
 }
 
 /* 结果状态 */

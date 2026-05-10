@@ -465,7 +465,15 @@ document.addEventListener('firebase:ready', async () => {
 
     // 题目内容
     html += '<div class="blackboard-quiz__question">';
-    html += '<div class="blackboard-quiz__qtext">' + qNum + '. ' + SharedUI.esc(q.question) + '</div>';
+    if (q.type === 'read') {
+      // 朗读题特殊排版：显示"朗读下面的文字"提示 + 居中大字体朗读内容
+      html += '<div class="blackboard-quiz__qtext">第' + (idx + 1) + '题：朗读下面的文字</div>';
+      if (!isAnswered) {
+        html += '<div class="blackboard-quiz__read-content" id="readContent">' + SharedUI.esc(q.question) + '</div>';
+      }
+    } else {
+      html += '<div class="blackboard-quiz__qtext">' + qNum + '. ' + SharedUI.esc(q.question) + '</div>';
+    }
 
     if (isAnswered) {
       html += renderResultContent(q, result, isRetry);
@@ -483,6 +491,11 @@ document.addEventListener('firebase:ready', async () => {
     // 绑定答题事件
     if (!isAnswered) {
       bindAnswerEvents(container, q, idx, session);
+    }
+
+    // 朗读题：渲染后自动调整朗读内容字体大小
+    if (q.type === 'read' && !isAnswered) {
+      setTimeout(autoSizeReadContent, 0);
     }
 
     // 如果当前题已有最终结果（已批改/超时），自动前进
@@ -503,7 +516,7 @@ document.addEventListener('firebase:ready', async () => {
           var lt = 0;
           latestResults.forEach(function(r) { lt += (r.earned || 0) + (r.retryEarned || 0); });
           doAdvance(session, latestResults, lt);
-        }, 1200);
+        }, 2500);
       }
     }
   }
@@ -526,7 +539,6 @@ document.addEventListener('firebase:ready', async () => {
         '<input type="text" class="blackboard-quiz__fill-input" id="quizFillInput" placeholder="输入答案..." maxlength="200">' +
       '</div>';
     } else if (type === 'read') {
-      html += '<div class="blackboard-quiz__read-hint">朗读以上内容，让家长评判</div>';
       html += '<button class="btn btn--primary btn--sm" id="btnReadDone" style="margin-top:var(--space-md)">朗读完成</button>';
     }
     return html;
@@ -793,6 +805,23 @@ document.addEventListener('firebase:ready', async () => {
 
   function getRetryResultIndex(session, originalIdx) {
     return (session.retryQueue || []).indexOf(originalIdx);
+  }
+
+  // ========== 朗读题自动字体大小 ==========
+
+  function autoSizeReadContent() {
+    var el = document.getElementById('readContent');
+    if (!el) return;
+    var origWS = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    var maxW = el.offsetWidth;
+    var size = 60;
+    el.style.fontSize = size + 'px';
+    while (size > 14 && el.scrollWidth > maxW * 1.05) {
+      size -= 2;
+      el.style.fontSize = size + 'px';
+    }
+    el.style.whiteSpace = origWS;
   }
 
   // ========== 结果渲染 ==========

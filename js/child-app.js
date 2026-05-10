@@ -447,8 +447,6 @@ document.addEventListener('firebase:ready', async () => {
       ? (result.retryStatus === 'retry-graded' || result.retryStatus === 'retry-submitted' || result.retryIsCorrect !== undefined)
       : (result.status !== 'pending');
 
-    var qNum = isRetry ? '回访 ' + (idx + 1) : (idx + 1);
-
     var html = '';
     // 进度条（仅在答题阶段且非回访模式下有时间限制时显示）
     if (!isRetry && q.timeLimit > 0 && !isAnswered) {
@@ -465,15 +463,13 @@ document.addEventListener('firebase:ready', async () => {
 
     // 题目内容
     html += '<div class="blackboard-quiz__question">';
-    if (q.type === 'read') {
-      // 朗读题特殊排版：显示"朗读下面的文字"提示 + 居中大字体朗读内容
-      html += '<div class="blackboard-quiz__qtext">第' + (idx + 1) + '题：朗读下面的文字</div>';
-      if (!isAnswered) {
-        html += '<div class="blackboard-quiz__read-content" id="readContent">' + SharedUI.esc(q.question) + '</div>';
-      }
-    } else {
-      html += '<div class="blackboard-quiz__qtext">' + qNum + '. ' + SharedUI.esc(q.question) + '</div>';
-    }
+
+    // 题型题号头（三种题型统一格式）
+    var qHeaders = { choice: '选择正确的答案', fill: '填入正确的答案', read: '朗读下面的文字' };
+    html += '<div class="blackboard-quiz__qtext">第' + (idx + 1) + '题：' + (qHeaders[q.type] || '') + '</div>';
+
+    // 题目文字（所有题型统一：居中大字体，自动适应）
+    html += '<div class="blackboard-quiz__qcontent" id="qContent">' + SharedUI.esc(q.question) + '</div>';
 
     if (isAnswered) {
       html += renderResultContent(q, result, isRetry);
@@ -493,10 +489,8 @@ document.addEventListener('firebase:ready', async () => {
       bindAnswerEvents(container, q, idx, session);
     }
 
-    // 朗读题：渲染后自动调整朗读内容字体大小
-    if (q.type === 'read' && !isAnswered) {
-      setTimeout(autoSizeReadContent, 0);
-    }
+    // 渲染后自动调整题目文字字体大小（所有题型）
+    setTimeout(autoSizeQContent, 0);
 
     // 如果当前题已有最终结果（已批改/超时），自动前进
     if (isAnswered) {
@@ -807,10 +801,10 @@ document.addEventListener('firebase:ready', async () => {
     return (session.retryQueue || []).indexOf(originalIdx);
   }
 
-  // ========== 朗读题自动字体大小 ==========
+  // ========== 题目文字自动字体大小 ==========
 
-  function autoSizeReadContent() {
-    var el = document.getElementById('readContent');
+  function autoSizeQContent() {
+    var el = document.getElementById('qContent');
     if (!el) return;
     var origWS = el.style.whiteSpace;
     el.style.whiteSpace = 'nowrap';

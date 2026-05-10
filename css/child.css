@@ -1054,14 +1054,14 @@
   border-color: var(--color-primary);
 }
 
-/* 朗读题内容区 — 居中大字体，自动适应 */
-.blackboard-quiz__read-content {
+/* 题目内容区 — 居中大字体，自动适应（所有题型共用） */
+.blackboard-quiz__qcontent {
   text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 120px;
-  padding: var(--space-md) var(--space-sm);
+  min-height: 100px;
+  padding: var(--space-sm);
   font-weight: 700;
   line-height: 1.4;
   color: var(--color-text-primary);

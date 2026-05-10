@@ -302,6 +302,70 @@ const Store = (() => {
     return db.collection(C.COLL_RESOURCES).doc(id).delete();
   }
 
+  // ========== 测验 ==========
+
+  function addQuiz(data) {
+    return db.collection(C.COLL_QUIZZES).add({
+      ...data,
+      createdAt: firebase.firestore.Timestamp.now()
+    });
+  }
+
+  function getQuizzes() {
+    return db.collection(C.COLL_QUIZZES)
+      .orderBy('createdAt', 'desc')
+      .get()
+      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
+
+  function getQuiz(id) {
+    return db.collection(C.COLL_QUIZZES).doc(id).get()
+      .then(doc => doc.exists ? { id: doc.id, ...doc.data() } : null);
+  }
+
+  function deleteQuiz(id) {
+    return db.collection(C.COLL_QUIZZES).doc(id).delete();
+  }
+
+  // ========== 测验 Session ==========
+
+  const QUIZ_SESSION_DOC_ID = 'singleton';
+
+  const QUIZ_SESSION_DEFAULTS = {
+    quizId: null,
+    phase: null,
+    currentIndex: 0,
+    totalEarned: 0,
+    childConfirmed: false,
+    questionResults: []
+  };
+
+  function getQuizSession() {
+    return db.collection(C.COLL_QUIZ_SESSIONS).doc(QUIZ_SESSION_DOC_ID).get()
+      .then(function(doc) {
+        return doc.exists ? doc.data() : null;
+      });
+  }
+
+  function onQuizSessionChange(callback) {
+    return db.collection(C.COLL_QUIZ_SESSIONS).doc(QUIZ_SESSION_DOC_ID)
+      .onSnapshot(function(doc) {
+        callback(doc.exists ? doc.data() : null);
+      });
+  }
+
+  function setQuizSession(data) {
+    return db.collection(C.COLL_QUIZ_SESSIONS).doc(QUIZ_SESSION_DOC_ID).set(data);
+  }
+
+  function updateQuizSession(data) {
+    return db.collection(C.COLL_QUIZ_SESSIONS).doc(QUIZ_SESSION_DOC_ID).update(data);
+  }
+
+  function deleteQuizSession() {
+    return db.collection(C.COLL_QUIZ_SESSIONS).doc(QUIZ_SESSION_DOC_ID).delete();
+  }
+
   // ========== 黑板 ==========
 
   const BLACKBOARD_DOC_ID = 'singleton';
@@ -352,6 +416,8 @@ const Store = (() => {
     addDeductionLog, getDeductionLogs, getDeductionLogsByDateRange,
     addTaskLog, getTaskLogs,
     getResources, onResourcesChange, addResource, deleteResource,
+    addQuiz, getQuizzes, getQuiz, deleteQuiz,
+    getQuizSession, onQuizSessionChange, setQuizSession, updateQuizSession, deleteQuizSession,
     getBlackboard, onBlackboardChange, setBlackboard,
     getAppConfig, updateAppConfig, setAppConfig, onAppConfigChange,
     runTransaction, batchWrite

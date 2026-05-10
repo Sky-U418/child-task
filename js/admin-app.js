@@ -95,6 +95,19 @@ document.addEventListener('firebase:ready', () => {
   const $btnBBClearText = document.getElementById('btnBBClearText');
   const $btnBBClear = document.getElementById('btnBBClear');
 
+  // Quiz
+  const $quizTitle = document.getElementById('quizTitle');
+  const $quizQuestions = document.getElementById('quizQuestions');
+  const $quizQuestionsHint = document.getElementById('quizQuestionsHint');
+  const $quizEditId = document.getElementById('quizEditId');
+  const $btnAddQuestion = document.getElementById('btnAddQuestion');
+  const $btnSaveQuiz = document.getElementById('btnSaveQuiz');
+  const $btnCancelQuizEdit = document.getElementById('btnCancelQuizEdit');
+  const $quizList = document.getElementById('quizList');
+  let quizQuestionsState = [];
+  let allQuizzes = [];
+  var _currentBlackboard = null;
+
   // Reports
   const $adminWeeklyCards = document.getElementById('adminWeeklyCards');
   const $adminMonthlyCard = document.getElementById('adminMonthlyCard');
@@ -381,7 +394,12 @@ document.addEventListener('firebase:ready', () => {
     });
 
     // 黑板状态监听
-    Store.onBlackboardChange(data => updateBBStatus(data));
+    Store.onBlackboardChange(function(data) {
+      _currentBlackboard = data;
+      updateBBStatus(data);
+      // 只在测验列表已加载时刷新卡片按钮状态，避免覆盖"暂无测验"
+      if (allQuizzes.length > 0) renderQuizList();
+    });
   }
 
   // ========== Tab 切换 ==========
@@ -473,7 +491,7 @@ document.addEventListener('firebase:ready', () => {
       $taskTitle.value = task.title || '';
       $taskDesc.value = task.description || '';
       $taskType.value = task.type || 'daily';
-      $taskPoints.value = task.points || 5;
+      $taskPoints.value = task.points !== undefined ? task.points : 5;
       if (task.deadline) {
         $taskDeadline.value = _fmtDate(task.deadline.toDate());
       } else {
@@ -1165,17 +1183,621 @@ document.addEventListener('firebase:ready', () => {
     }
   });
 
+  // ========== 测验管理 ==========
+
+  let _questionIdCounter = 0;
+
+  function renderQuestionForm(index, data) {
+    data = data || { question: '', type: 'choice', options: ['', '', '', ''], correctIndex: 0, points: 5, timeLimit: 0, acceptableAnswers: [] };
+    const qId = 'q_' + (++_questionIdCounter);
+    var type = data.type || 'choice';
+    var html = '<div class="quiz-question" data-qid="' + qId + '">' +
+      '<div class="quiz-question__header">' +
+        '<span class="quiz-question__number">第 ' + (index + 1) + ' 题</span>' +
+        '<button class="quiz-question__remove" data-action="removeQuestion" data-qid="' + qId + '" title="删除此题">&times;</button>' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<input type="text" class="form-input" data-field="questionText" value="' + SharedUI.esc(data.question) + '" placeholder="输入题目，例如：1+1等于几？" maxlength="200">' +
+      '</div>' +
+      '<div class="form-group" style="margin-bottom:var(--space-sm)">' +
+        '<div class="quiz-type-tabs" data-field="questionType">' +
+          '<button type="button" class="quiz-type-tab' + (type === 'choice' ? ' is-active' : '') + '" data-type-value="choice">选择题</button>' +
+          '<button type="button" class="quiz-type-tab' + (type === 'fill' ? ' is-active' : '') + '" data-type-value="fill">填空题</button>' +
+          '<button type="button" class="quiz-type-tab' + (type === 'read' ? ' is-active' : '') + '" data-type-value="read">朗读题</button>' +
+        '</div>' +
+      '</div>';
+
+    if (type === 'choice') {
+      html += '<div class="quiz-question__options">' +
+        data.options.map(function(opt, oi) {
+          return '<label class="quiz-option">' +
+            '<input type="radio" class="quiz-option__input" name="correct_' + qId + '" value="' + oi + '"' + (oi === data.correctIndex ? ' checked' : '') + '>' +
+            '<input type="text" class="quiz-option__text" data-field="option_' + oi + '" value="' + SharedUI.esc(opt) + '" placeholder="选项 ' + String.fromCharCode(65 + oi) + '" maxlength="100">' +
+          '</label>';
+        }).join('') +
+      '</div>';
+    } else if (type === 'fill') {
+      html += '<div class="form-group">' +
+        '<label class="form-label" style="font-size:var(--text-xs);color:var(--color-text-secondary)">参考答案（逗号分隔，供家长批改参考）</label>' +
+        '<input type="text" class="form-input" data-field="acceptableAnswers" value="' + SharedUI.esc((data.acceptableAnswers || []).join('、')) + '" placeholder="例如：光合作用,photosynthesis" maxlength="500">' +
+      '</div>';
+    } else if (type === 'read') {
+      html += '<p style="font-size:var(--text-xs);color:var(--color-text-muted);padding:var(--space-sm) 0">📖 孩子朗读题目内容，家长在批改面板评判</p>';
+    }
+
+    html += '<div class="quiz-question__points-row">' +
+      '<span class="quiz-question__points-label">分值</span>' +
+      '<input type="number" class="quiz-question__points-input" data-field="points" value="' + data.points + '" min="0" max="999">' +
+      '<span class="quiz-question__points-label" style="margin-left:var(--space-md)">限时(秒)</span>' +
+      '<input type="number" class="quiz-question__points-input" data-field="timeLimit" value="' + (data.timeLimit || 0) + '" min="0" max="999" title="0=不限时">' +
+    '</div>' +
+    '</div>';
+    return html;
+  }
+
+  function collectQuestionsFromDOM() {
+    var els = $quizQuestions.querySelectorAll('.quiz-question');
+    var questions = [];
+    els.forEach(function(el) {
+      var question = el.querySelector('[data-field="questionText"]').value.trim();
+      if (!question) return;
+      var type = el.querySelector('.quiz-type-tab.is-active').dataset.typeValue;
+      var pts = parseInt(el.querySelector('[data-field="points"]').value, 10);
+      if (isNaN(pts) || pts < 0) pts = 0;
+
+      var tlInput = el.querySelector('[data-field="timeLimit"]');
+      var timeLimit = tlInput ? parseInt(tlInput.value, 10) : 0;
+      if (isNaN(timeLimit) || timeLimit < 0) timeLimit = 0;
+      var q = { question: question, type: type, points: pts, timeLimit: timeLimit };
+
+      if (type === 'choice') {
+        var options = [];
+        for (var i = 0; i < 4; i++) {
+          options.push(el.querySelector('[data-field="option_' + i + '"]').value.trim());
+        }
+        var selected = el.querySelector('input[type="radio"]:checked');
+        var correctIndex = selected ? parseInt(selected.value, 10) : 0;
+        q.options = options;
+        q.correctIndex = correctIndex;
+      } else if (type === 'fill') {
+        var aaInput = el.querySelector('[data-field="acceptableAnswers"]');
+        var aa = aaInput ? aaInput.value : '';
+        q.acceptableAnswers = aa.split(/[,，、]/).map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+      }
+      // read 类型不需要额外字段
+
+      questions.push(q);
+    });
+    return questions;
+  }
+
+  /** 将 DOM 输入同步到 quizQuestionsState（保留空题，防止重渲染丢数据） */
+  function syncQuizStateFromDOM() {
+    var els = $quizQuestions.querySelectorAll('.quiz-question');
+    var newState = [];
+    els.forEach(function(el, idx) {
+      var qTextInput = el.querySelector('[data-field="questionText"]');
+      var typeTab = el.querySelector('.quiz-type-tab.is-active');
+      var ptsInput = el.querySelector('[data-field="points"]');
+
+      var qText = qTextInput ? qTextInput.value : '';
+      var type = typeTab ? typeTab.dataset.typeValue : 'choice';
+      var pts = ptsInput ? parseInt(ptsInput.value, 10) : 0;
+      if (isNaN(pts) || pts < 0) pts = 0;
+
+      // 从旧状态继承之前的数据（包括选项、答案等）
+      var old = quizQuestionsState[idx] || {};
+
+      var tlInput = el.querySelector('[data-field="timeLimit"]');
+      var timeLimit = tlInput ? parseInt(tlInput.value, 10) : (old.timeLimit || 0);
+      if (isNaN(timeLimit) || timeLimit < 0) timeLimit = 0;
+
+      var entry = { question: qText, type: type, points: pts, timeLimit: timeLimit };
+
+      if (type === 'choice') {
+        // 选项输入框可能不存在（刚从其他题型切换过来），不存在则用旧值
+        var opt0 = el.querySelector('[data-field="option_0"]');
+        if (opt0) {
+          var opts = [];
+          for (var i = 0; i < 4; i++) {
+            opts.push(el.querySelector('[data-field="option_' + i + '"]').value);
+          }
+          var selected = el.querySelector('input[type="radio"]:checked');
+          var cIdx = selected ? parseInt(selected.value, 10) : 0;
+          entry.options = opts;
+          entry.correctIndex = cIdx;
+        } else {
+          entry.options = old.options || ['', '', '', ''];
+          entry.correctIndex = old.correctIndex !== undefined ? old.correctIndex : 0;
+        }
+      } else {
+        // 非选择题：继承旧状态的选项数据，防止切换回来时丢失
+        entry.options = old.options || ['', '', '', ''];
+        entry.correctIndex = old.correctIndex !== undefined ? old.correctIndex : 0;
+
+        if (type === 'fill') {
+          // 参考答案输入框可能不存在（刚从其他题型切换过来）
+          var aaInput = el.querySelector('[data-field="acceptableAnswers"]');
+          if (aaInput) {
+            entry.acceptableAnswers = aaInput.value.split(/[,，、]/).map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+          } else {
+            entry.acceptableAnswers = old.acceptableAnswers || [];
+          }
+        }
+      }
+
+      newState.push(entry);
+    });
+    quizQuestionsState = newState;
+  }
+
+  function refreshQuizQuestionsUI() {
+    if (quizQuestionsState.length === 0) {
+      $quizQuestions.innerHTML = '';
+      $quizQuestionsHint.style.display = '';
+      return;
+    }
+    $quizQuestionsHint.style.display = 'none';
+    var html = '';
+    for (var i = 0; i < quizQuestionsState.length; i++) {
+      html += renderQuestionForm(i, quizQuestionsState[i]);
+    }
+    $quizQuestions.innerHTML = html;
+  }
+
+  $btnAddQuestion.addEventListener('click', function() {
+    syncQuizStateFromDOM();
+    var last = quizQuestionsState[quizQuestionsState.length - 1] || {};
+    quizQuestionsState.push({
+      question: '', type: 'choice',
+      options: ['', '', '', ''], correctIndex: 0,
+      points: last.points || 0,
+      timeLimit: last.timeLimit || 0
+    });
+    refreshQuizQuestionsUI();
+  });
+
+  // 删除题目
+  $quizQuestions.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action="removeQuestion"]');
+    if (!btn) return;
+    syncQuizStateFromDOM();
+    var qid = btn.dataset.qid;
+    var els = $quizQuestions.querySelectorAll('.quiz-question');
+    var idx = -1;
+    for (var i = 0; i < els.length; i++) {
+      if (els[i].dataset.qid === qid) { idx = i; break; }
+    }
+    if (idx >= 0) {
+      quizQuestionsState.splice(idx, 1);
+      refreshQuizQuestionsUI();
+    }
+  });
+
+  // 切换题型 → 重新渲染该题
+  $quizQuestions.addEventListener('click', function(e) {
+    var tab = e.target.closest('.quiz-type-tab');
+    if (!tab) return;
+    var group = tab.closest('.quiz-type-tabs');
+    if (!group) return;
+    group.querySelectorAll('.quiz-type-tab').forEach(function(t) { t.classList.remove('is-active'); });
+    tab.classList.add('is-active');
+    syncQuizStateFromDOM();
+    refreshQuizQuestionsUI();
+  });
+
+  $btnSaveQuiz.addEventListener('click', async function() {
+    var title = $quizTitle.value.trim();
+    if (!title) { UI.toast('请输入测验标题', 'error'); return; }
+
+    var questions = collectQuestionsFromDOM();
+    if (questions.length === 0) { UI.toast('请至少添加一道题目', 'error'); return; }
+
+    for (var i = 0; i < questions.length; i++) {
+      var q = questions[i];
+      if (!q.question) { UI.toast('第 ' + (i + 1) + ' 题缺少题目内容', 'error'); return; }
+      if (q.type === 'choice') {
+        var emptyIdx = q.options.indexOf('');
+        if (emptyIdx >= 0) { UI.toast('第 ' + (i + 1) + ' 题的选项 ' + String.fromCharCode(65 + emptyIdx) + ' 为空', 'error'); return; }
+      }
+    }
+
+    var totalPoints = 0;
+    for (var i = 0; i < questions.length; i++) {
+      totalPoints += (questions[i].points !== undefined ? questions[i].points : 5);
+    }
+    var editId = $quizEditId.value;
+
+    try {
+      if (editId) {
+        await Store.deleteQuiz(editId);
+      }
+      await Store.addQuiz({ title: title, questions: questions, totalPoints: totalPoints });
+      UI.toast('测验已保存', 'success');
+      resetQuizForm();
+      loadQuizzes();
+    } catch (err) {
+      UI.toast('保存失败: ' + err.message, 'error');
+    }
+  });
+
+  $btnCancelQuizEdit.addEventListener('click', resetQuizForm);
+
+  function loadQuizToForm(quiz) {
+    $quizTitle.value = quiz.title || '';
+    $quizEditId.value = quiz.id;
+
+    quizQuestionsState = (quiz.questions || []).map(function(q) {
+      return {
+        question: q.question || '',
+        type: q.type || 'choice',
+        options: q.options || ['', '', '', ''],
+        correctIndex: q.correctIndex !== undefined ? q.correctIndex : 0,
+        points: q.points || 0,
+        timeLimit: q.timeLimit || 0,
+        acceptableAnswers: q.acceptableAnswers || []
+      };
+    });
+    refreshQuizQuestionsUI();
+    $btnCancelQuizEdit.style.display = '';
+    // 滚动到表单区域
+    $quizTitle.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function resetQuizForm() {
+    $quizTitle.value = '';
+    $quizQuestions.innerHTML = '';
+    $quizQuestionsHint.style.display = '';
+    $quizEditId.value = '';
+    quizQuestionsState = [];
+    $btnCancelQuizEdit.style.display = 'none';
+  }
+
+  async function loadQuizzes() {
+    try {
+      allQuizzes = await Store.getQuizzes();
+      renderQuizList();
+    } catch (err) {
+      console.error('加载测验列表失败:', err);
+    }
+  }
+
+  function renderQuizList() {
+    if (allQuizzes.length === 0) {
+      $quizList.innerHTML = '<p style="color:var(--color-text-muted);text-align:center;padding:var(--space-xl)">暂无测验</p>';
+      return;
+    }
+
+    var html = '';
+    for (var i = 0; i < allQuizzes.length; i++) {
+      var q = allQuizzes[i];
+      var qCount = (q.questions && q.questions.length) || 0;
+      // 统计题型分布
+      var typeLabels = { choice: '选择', fill: '填空', read: '朗读' };
+      var typeCount = {};
+      (q.questions || []).forEach(function(x) {
+        var t = x.type || 'choice';
+        typeCount[t] = (typeCount[t] || 0) + 1;
+      });
+      var typeStr = Object.keys(typeCount).map(function(t) {
+        return typeLabels[t] || t;
+      }).join('+');
+      var isPushed = _currentBlackboard && _currentBlackboard.contentType === 'quiz' && _currentBlackboard.quizId === q.id;
+      html += '<div class="quiz-card">' +
+        '<div class="quiz-card__info">' +
+          '<div class="quiz-card__title">' + SharedUI.esc(q.title) + '</div>' +
+          '<div class="quiz-card__meta">' + qCount + ' 题 · 共 ' + (q.totalPoints || 0) + ' 分' +
+            (typeStr ? ' · ' + typeStr : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="quiz-card__actions">' +
+          (isPushed
+            ? '<button class="quiz-card__retract" data-action="retractQuiz" data-id="' + q.id + '" title="撤回测验">撤回</button>'
+            : '<button class="quiz-card__push" data-action="pushQuiz" data-id="' + q.id + '" title="推送到黑板">📌</button>'
+          ) +
+          '<button class="quiz-card__edit" data-action="editQuiz" data-id="' + q.id + '" title="编辑测验">✏️</button>' +
+          '<button class="quiz-card__delete" data-action="deleteQuiz" data-id="' + q.id + '" title="删除测验">&times;</button>' +
+        '</div>' +
+      '</div>';
+    }
+    $quizList.innerHTML = html;
+  }
+
+  $quizList.addEventListener('click', async function(e) {
+    var retractBtn = e.target.closest('[data-action="retractQuiz"]');
+    if (retractBtn) {
+      try {
+        await Store.deleteQuizSession();
+        await Store.setBlackboard({
+          contentType: null,
+          textContent: '',
+          resourceId: '',
+          resourceName: '',
+          resourceUrl: '',
+          resourceContentType: ''
+        });
+        UI.toast('测验已撤回', 'info');
+      } catch (err) {
+        UI.toast('撤回失败: ' + err.message, 'error');
+      }
+      loadQuizzes();
+      return;
+    }
+
+    var pushBtn = e.target.closest('[data-action="pushQuiz"]');
+    if (pushBtn) {
+      var id = pushBtn.dataset.id;
+      try {
+        await Store.setBlackboard({
+          contentType: 'quiz',
+          quizId: id,
+          textContent: '',
+          resourceId: '',
+          resourceName: '',
+          resourceUrl: '',
+          resourceContentType: ''
+        });
+        UI.toast('测验已推送到黑板', 'success');
+      } catch (err) {
+        UI.toast('推送失败: ' + err.message, 'error');
+      }
+      return;
+    }
+
+    var editBtn = e.target.closest('[data-action="editQuiz"]');
+    if (editBtn) {
+      var id = editBtn.dataset.id;
+      var quiz = allQuizzes.find(function(q) { return q.id === id; });
+      if (quiz) loadQuizToForm(quiz);
+      return;
+    }
+
+    var delBtn = e.target.closest('[data-action="deleteQuiz"]');
+    if (delBtn) {
+      var id = delBtn.dataset.id;
+      var ok = await UI.confirm('删除测验', '确定要删除该测验吗？');
+      if (!ok) return;
+      try {
+        await Store.deleteQuiz(id);
+        UI.toast('测验已删除', 'info');
+        loadQuizzes();
+      } catch (err) {
+        UI.toast('删除失败: ' + err.message, 'error');
+      }
+      return;
+    }
+  });
+
+  // 黑板状态显示
   function updateBBStatus(data) {
-    const ct = data && data.contentType ? data.contentType : null;
+    var ct = data && data.contentType ? data.contentType : null;
     if (!ct) {
       $bbStatus.innerHTML = '当前：<span style="color:var(--color-text-muted)">空</span>';
     } else if (ct === 'text') {
-      const preview = (data.textContent || '').substring(0, 20);
-      $bbStatus.innerHTML = '当前：文字 <span class="bb-status__accent">「' + SharedUI.esc(preview) + (data.textContent && data.textContent.length > 20 ? '…' : '') + '」</span>';
+      var preview = (data.textContent || '').substring(0, 20);
+      $bbStatus.innerHTML = '当前：文字 <span class="bb-status__accent">"' + SharedUI.esc(preview) + (data.textContent && data.textContent.length > 20 ? '...' : '') + '"</span>';
     } else if (ct === 'resource') {
-      $bbStatus.innerHTML = '当前：资源 <span class="bb-status__accent">「' + SharedUI.esc(data.resourceName || '未命名') + '」</span>';
+      $bbStatus.innerHTML = '当前：资源 <span class="bb-status__accent">"' + SharedUI.esc(data.resourceName || '未命名') + '"</span>';
+    } else if (ct === 'quiz') {
+      $bbStatus.innerHTML = '当前：<span class="bb-status__accent">📝 测验</span>';
     }
   }
+
+
+
+
+  // ========== 批改面板 ==========
+
+  const $gradingPanel = document.getElementById('gradingPanel');
+  const $gradingQuizTitle = document.getElementById('gradingQuizTitle');
+  const $gradingList = document.getElementById('gradingList');
+  var _gradingQuiz = null;
+  var _gradingSessionUnsub = null;
+
+  function cleanupGrading() {
+    if (_gradingSessionUnsub) { _gradingSessionUnsub(); _gradingSessionUnsub = null; }
+    _gradingQuiz = null;
+    $gradingPanel.style.display = 'none';
+  }
+
+  function initGrading(session) {
+    if (!session || !session.quizId) { cleanupGrading(); return; }
+    $gradingPanel.style.display = '';
+
+    // 加载测验信息
+    Store.getQuiz(session.quizId).then(function(quiz) {
+      if (!quiz) { $gradingList.innerHTML = '<p style="color:var(--color-text-muted)">测验已删除</p>'; return; }
+      _gradingQuiz = quiz;
+      renderGrading(quiz, session);
+    });
+  }
+
+  function renderGrading(quiz, session) {
+    $gradingQuizTitle.textContent = SharedUI.esc(quiz.title);
+    var questions = quiz.questions || [];
+    var results = session.questionResults || [];
+
+    var html = '';
+    for (var i = 0; i < questions.length; i++) {
+      var q = questions[i];
+      var r = results[i] || {};
+      var type = q.type || 'choice';
+
+      html += '<div class="grading-card' + (needsGrading(r, type) ? ' is-pending' : '') + '">';
+      html += '<div class="grading-card__header">';
+      html += '<span class="grading-card__num">第 ' + (i + 1) + ' 题</span>';
+      html += '<span class="grading-card__type">' + getTypeLabel(type) + '</span>';
+      html += '</div>';
+      html += '<div class="grading-card__question">' + SharedUI.esc(q.question) + '</div>';
+
+      if (type === 'choice') {
+        var cIdx = q.correctIndex;
+        var chosen = r.childAnswer;
+        if (r.status === 'timedout') {
+          html += '<div class="grading-card__result"><span class="grading-badge is-wrong">⏰ 超时</span></div>';
+        } else if (r.isCorrect === true) {
+          html += '<div class="grading-card__result"><span class="grading-badge is-correct">✅ 正确</span></div>';
+        } else if (r.isCorrect === false) {
+          html += '<div class="grading-card__result"><span class="grading-badge is-wrong">❌ 错误</span> 选了: ' + SharedUI.esc(q.options[chosen]) + '</div>';
+        } else if (r.status === 'pending') {
+          html += '<div class="grading-card__result"><span class="grading-badge is-pending">⏳ 待回答</span></div>';
+        }
+        // 回访状态
+        if (r.retryIsCorrect === true) {
+          html += '<div class="grading-card__retry-note">回访: ✅ 正确 (+' + (r.retryEarned || 0) + '分)</div>';
+        } else if (r.retryIsCorrect === false) {
+          html += '<div class="grading-card__retry-note">回访: ❌ 错误</div>';
+        }
+      } else if (type === 'fill') {
+        // 检查首次答题状态
+        if (r.status === 'submitted' && r.isCorrect === null) {
+          html += '<div class="grading-card__answer">答案：' + SharedUI.esc(r.childAnswer) + '</div>';
+          html += '<div class="grading-card__actions">';
+          html += '<button class="btn btn--sm btn--success grading-btn" data-action="gradeFill" data-qidx="' + i + '" data-correct="true">✓ 正确</button>';
+          html += '<button class="btn btn--sm btn--danger grading-btn" data-action="gradeFill" data-qidx="' + i + '" data-correct="false">✗ 错误</button>';
+          html += '</div>';
+        } else if (r.isCorrect === true) {
+          html += '<div class="grading-card__result"><span class="grading-badge is-correct">✅ 已批改: 正确 (' + (r.earned || 0) + '分)</span></div>';
+          html += '<div class="grading-card__answer">答案：' + SharedUI.esc(r.childAnswer) + '</div>';
+        } else if (r.isCorrect === false) {
+          html += '<div class="grading-card__result"><span class="grading-badge is-wrong">已批改: 错误</span></div>';
+          html += '<div class="grading-card__answer">答案：' + SharedUI.esc(r.childAnswer) + '</div>';
+        } else if (r.status === 'pending') {
+          html += '<div class="grading-card__result"><span class="grading-badge is-pending">⏳ 待作答</span></div>';
+        }
+        // 回访状态
+        if (r.retryStatus === 'retry-submitted' && r.retryIsCorrect === null) {
+          html += '<div class="grading-card__answer">回访答案：' + SharedUI.esc(r.retryChildAnswer || '') + '</div>';
+          html += '<div class="grading-card__actions">';
+          html += '<button class="btn btn--sm btn--success grading-btn" data-action="gradeFillRetry" data-qidx="' + i + '" data-correct="true">✓ 回访正确</button>';
+          html += '<button class="btn btn--sm btn--danger grading-btn" data-action="gradeFillRetry" data-qidx="' + i + '" data-correct="false">✗ 回访错误</button>';
+          html += '</div>';
+        } else if (r.retryIsCorrect === true) {
+          html += '<div class="grading-card__retry-note">回访: ✅ 正确 (+' + (r.retryEarned || 0) + '分)</div>';
+        } else if (r.retryIsCorrect === false) {
+          html += '<div class="grading-card__retry-note">回访: ❌ 错误</div>';
+        }
+      } else if (type === 'read') {
+        if (r.status === 'submitted' && r.isCorrect === null) {
+          html += '<div class="grading-card__actions">';
+          html += '<button class="btn btn--sm btn--success grading-btn" data-action="gradeRead" data-qidx="' + i + '" data-correct="true">✓ 过关</button>';
+          html += '<button class="btn btn--sm btn--danger grading-btn" data-action="gradeRead" data-qidx="' + i + '" data-correct="false">✗ 不过关</button>';
+          html += '</div>';
+        } else if (r.status === 'pending') {
+          html += '<div class="grading-card__result"><span class="grading-badge is-pending">⏳ 待朗读</span></div>';
+        } else if (r.isCorrect === true) {
+          html += '<div class="grading-card__result"><span class="grading-badge is-correct">✅ 已判: 过关 (' + (r.earned || 0) + '分)</span></div>';
+        } else if (r.isCorrect === false) {
+          html += '<div class="grading-card__result"><span class="grading-badge is-wrong">已判: 不过关</span></div>';
+        }
+        // 回访
+        if (r.retryIsCorrect === null && r.retryStatus === 'retry-submitted') {
+          html += '<div class="grading-card__actions">';
+          html += '<button class="btn btn--sm btn--success grading-btn" data-action="gradeReadRetry" data-qidx="' + i + '" data-correct="true">✓ 回访过关</button>';
+          html += '<button class="btn btn--sm btn--danger grading-btn" data-action="gradeReadRetry" data-qidx="' + i + '" data-correct="false">✗ 回访不过关</button>';
+          html += '</div>';
+        } else if (r.retryIsCorrect === true) {
+          html += '<div class="grading-card__retry-note">回访过关 (+' + (r.retryEarned || 0) + '分)</div>';
+        } else if (r.retryIsCorrect === false) {
+          html += '<div class="grading-card__retry-note">回访不过关</div>';
+        }
+      }
+
+      // 参考答案（填空）
+      if (type === 'fill' && q.acceptableAnswers && q.acceptableAnswers.length > 0) {
+        html += '<div class="grading-card__ref">参考答案：' + SharedUI.esc(q.acceptableAnswers.join('、')) + '</div>';
+      }
+
+      html += '</div>';
+    }
+
+    $gradingList.innerHTML = html;
+
+    // 绑批改按钮事件
+    $gradingList.querySelectorAll('.grading-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        var action = this.dataset.action;
+        var qIdx = parseInt(this.dataset.qidx, 10);
+        var correct = this.dataset.correct === 'true';
+        handleGrade(action, qIdx, correct);
+      });
+    });
+  }
+
+  function needsGrading(r, type) {
+    if (type === 'fill' && r.status === 'submitted' && r.isCorrect === null) return true;
+    if (type === 'fill' && r.retryStatus === 'retry-submitted' && r.retryIsCorrect === null) return true;
+    if (type === 'read' && r.status === 'submitted' && r.isCorrect === null) return true;
+    if (type === 'read' && r.retryIsCorrect === null && r.retryStatus === 'retry-submitted') return true;
+    return false;
+  }
+
+  function getTypeLabel(type) {
+    if (type === 'choice') return '选择';
+    if (type === 'fill') return '填空';
+    if (type === 'read') return '朗读';
+    return type;
+  }
+
+  function handleGrade(action, qIdx, correct) {
+    var session = _gradingSession; // set in listener
+    if (!session) return;
+    var results = session.questionResults.slice();
+    var r = results[qIdx];
+
+    if (action === 'gradeFill') {
+      var pts = correct ? ((_gradingQuiz.questions[qIdx].points !== undefined ? _gradingQuiz.questions[qIdx].points : 5)) : 0;
+      results[qIdx] = Object.assign({}, r, {
+        isCorrect: correct,
+        earned: pts
+      });
+    } else if (action === 'gradeFillRetry') {
+      var pts = correct ? Math.floor(((_gradingQuiz.questions[qIdx].points !== undefined ? _gradingQuiz.questions[qIdx].points : 5)) / 2) : 0;
+      results[qIdx] = Object.assign({}, r, {
+        retryIsCorrect: correct,
+        retryEarned: pts,
+        retryStatus: 'retry-graded'
+      });
+    } else if (action === 'gradeRead') {
+      var pts = correct ? ((_gradingQuiz.questions[qIdx].points !== undefined ? _gradingQuiz.questions[qIdx].points : 5)) : 0;
+      results[qIdx] = Object.assign({}, r, {
+        status: 'graded',
+        isCorrect: correct,
+        earned: pts
+      });
+    } else if (action === 'gradeReadRetry') {
+      var pts = correct ? Math.floor(((_gradingQuiz.questions[qIdx].points !== undefined ? _gradingQuiz.questions[qIdx].points : 5)) / 2) : 0;
+      results[qIdx] = Object.assign({}, r, {
+        retryIsCorrect: correct,
+        retryEarned: pts,
+        retryStatus: 'retry-graded'
+      });
+    }
+
+    // 重新计算总分
+    var newTotal = 0;
+    results.forEach(function(res) {
+      newTotal += (res.earned || 0);
+      if (res.retryEarned) newTotal += res.retryEarned;
+    });
+
+    Store.updateQuizSession({ questionResults: results, totalEarned: newTotal });
+    UI.toast('已评分', 'success');
+  }
+
+  var _gradingSession = null;
+
+  // 监听 session → 控制批改面板
+  Store.onQuizSessionChange(function(session) {
+    _gradingSession = session;
+    if (session && session.phase !== 'done' && session.phase !== null) {
+      initGrading(session);
+    } else {
+      cleanupGrading();
+    }
+  });
+
+  loadQuizzes();
 
   $btnAddResource.addEventListener('click', async () => {
     const url = $resUrl.value.trim();

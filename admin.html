@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>指挥中心 — 管理员面板</title>
-  <link rel="stylesheet" href="css/common.css?v=41">
-  <link rel="stylesheet" href="css/admin.css?v=41">
+  <link rel="stylesheet" href="css/common.css?v=48">
+  <link rel="stylesheet" href="css/admin.css?v=48">
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
@@ -268,6 +268,53 @@
           <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-xl)">暂无资源</p>
         </div>
       </div>
+
+      <!-- ===== 测验管理 ===== -->
+      <div class="config-section">
+        <h3 class="config-section__title">测验管理</h3>
+
+        <div class="form-group">
+          <label class="form-label" for="quizTitle">测验标题</label>
+          <input type="text" class="form-input" id="quizTitle" placeholder="例如：数学小测验" maxlength="50">
+        </div>
+
+        <div id="quizQuestions">
+          <!-- 题目列表由 JS 动态渲染 -->
+        </div>
+        <p style="font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:var(--space-sm)" id="quizQuestionsHint">暂无题目，请点击下方按钮添加</p>
+
+        <div class="form-actions" style="justify-content:flex-start;margin-top:var(--space-sm)">
+          <button class="btn btn--outline btn--sm" id="btnAddQuestion">+ 添加题目</button>
+        </div>
+
+        <div class="form-actions" style="justify-content:flex-start;margin-top:var(--space-md)">
+          <button class="btn btn--primary" id="btnSaveQuiz">保存测验</button>
+          <button class="btn btn--ghost" id="btnCancelQuizEdit" style="display:none">取消编辑</button>
+        </div>
+
+        <input type="hidden" id="quizEditId">
+
+        <hr style="border-color:var(--color-border);margin:var(--space-md) 0">
+
+        <label class="form-label">已有测验</label>
+        <p style="font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:var(--space-sm)">
+          点击测验卡片上的 <span style="color:var(--color-accent)">📌</span> 推送到黑板
+        </p>
+        <div class="quiz-list" id="quizList">
+          <p style="color:var(--color-text-muted);text-align:center;padding:var(--space-xl)">暂无测验</p>
+        </div>
+
+        <hr style="border-color:var(--color-border);margin:var(--space-md) 0">
+
+        <!-- 批改面板 -->
+        <div id="gradingPanel" style="display:none">
+          <label class="form-label">测验批改</label>
+          <p style="font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:var(--space-sm)">
+            当前测验：<span id="gradingQuizTitle"></span>
+          </p>
+          <div id="gradingList"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ===== 积分配置面板 ===== -->
@@ -404,18 +451,18 @@
   </div>
 
   <!-- JS 依赖（顺序加载） -->
-  <script src="js/firebase-config.js?v=41"></script>
-  <script src="js/app-config.js?v=41"></script>
-  <script src="js/store.js?v=41"></script>
-  <script src="js/points.js?v=41"></script>
-  <script src="js/tasks.js?v=41"></script>
-  <script src="js/rewards.js?v=41"></script>
-  <script src="js/streak.js?v=41"></script>
-  <script src="js/reports.js?v=41"></script>
-  <script src="js/shared-ui.js?v=41"></script>
-  <script src="js/ui.js?v=41"></script>
-  <script src="js/router.js?v=41"></script>
-  <script src="js/resource-manager.js?v=41"></script>
-  <script src="js/admin-app.js?v=41"></script>
+  <script src="js/firebase-config.js?v=48"></script>
+  <script src="js/app-config.js?v=48"></script>
+  <script src="js/store.js?v=48"></script>
+  <script src="js/points.js?v=48"></script>
+  <script src="js/tasks.js?v=48"></script>
+  <script src="js/rewards.js?v=48"></script>
+  <script src="js/streak.js?v=48"></script>
+  <script src="js/reports.js?v=48"></script>
+  <script src="js/shared-ui.js?v=48"></script>
+  <script src="js/ui.js?v=48"></script>
+  <script src="js/router.js?v=48"></script>
+  <script src="js/resource-manager.js?v=48"></script>
+  <script src="js/admin-app.js?v=48"></script>
 </body>
 </html>

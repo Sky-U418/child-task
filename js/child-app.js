@@ -244,13 +244,39 @@ document.addEventListener('firebase:ready', async () => {
 
   // ========== 小黑板渲染 ==========
 
+  // ---- Quiz Engine（测验引擎）----
+  var _quizEngine = {
+    quiz: null,
+    session: null,
+    sessionUnsub: null,
+    timerHandle: null,
+    timerRemaining: 0,
+    timerTotal: 0,
+    advanceTimer: null,
+    container: null
+  };
+
+  function cleanupQuizEngine() {
+    if (_quizEngine.sessionUnsub) { _quizEngine.sessionUnsub(); _quizEngine.sessionUnsub = null; }
+    clearQuizTimer();
+    if (_quizEngine.advanceTimer) { clearTimeout(_quizEngine.advanceTimer); _quizEngine.advanceTimer = null; }
+    _quizEngine.quiz = null;
+    _quizEngine.container = null;
+  }
+
+  function clearQuizTimer() {
+    if (_quizEngine.timerHandle) { clearInterval(_quizEngine.timerHandle); _quizEngine.timerHandle = null; }
+  }
+
   function renderBlackboard(data) {
-    const ct = data && data.contentType ? data.contentType : null;
+    var ct = data && data.contentType ? data.contentType : null;
 
     // 隐藏所有
     $blackboardEmpty.style.display = 'none';
     $blackboardText.style.display = 'none';
     $blackboardResource.style.display = 'none';
+    removeQuizContainer();
+    cleanupQuizEngine();
 
     if (!ct) {
       $blackboardEmpty.style.display = '';
@@ -271,8 +297,8 @@ document.addEventListener('firebase:ready', async () => {
       $blackboardExtLink.style.display = 'none';
       $blackboardYoutubeIframe.src = '';
 
-      const rct = data.resourceContentType || '';
-      const url = data.resourceUrl || '';
+      var rct = data.resourceContentType || '';
+      var url = data.resourceUrl || '';
 
       if (rct.startsWith('image/')) {
         $blackboardImg.src = url;
@@ -290,7 +316,7 @@ document.addEventListener('firebase:ready', async () => {
           $blackboardExtLink.style.display = '';
         } else {
           $blackboardVideo.src = url;
-          $blackboardVideo.onerror = () => {
+          $blackboardVideo.onerror = function() {
             $blackboardVideo.style.display = 'none';
             $blackboardExtLinkName.textContent = data.resourceName || '视频资源';
             $blackboardExtLinkBtn.href = url;
@@ -311,8 +337,700 @@ document.addEventListener('firebase:ready', async () => {
         $blackboardOtherName.textContent = data.resourceName || '未知资源';
         $blackboardOther.style.display = '';
       }
+    } else if (ct === 'quiz' && data.quizId) {
+      initQuizEngine(data.quizId);
     }
   }
+
+  function removeQuizContainer() {
+    var existing = document.getElementById('blackboardQuizContainer');
+    if (existing) existing.remove();
+  }
+
+  // ========== Quiz Engine 核心 ==========
+
+  function initQuizEngine(quizId) {
+    var frame = document.querySelector('.blackboard-frame');
+    if (!frame) return;
+
+    removeQuizContainer();
+    cleanupQuizEngine();
+
+    var container = document.createElement('div');
+    container.className = 'blackboard-quiz';
+    container.id = 'blackboardQuizContainer';
+    container.innerHTML = '<div class="blackboard-quiz__title">📝 测验</div><p style="text-align:center;color:var(--color-text-muted);padding:var(--space-lg)">加载中...</p>';
+    frame.appendChild(container);
+    _quizEngine.container = container;
+
+    Store.getQuiz(quizId).then(function(quiz) {
+      if (!quiz) {
+        container.innerHTML = '<p style="text-align:center;color:var(--color-text-muted);padding:var(--space-lg)">测验已失效</p>';
+        return;
+      }
+      _quizEngine.quiz = quiz;
+
+      // 监听 session 变化 → 驱动渲染
+      _quizEngine.sessionUnsub = Store.onQuizSessionChange(function(session) {
+        onQuizSessionChange(container, quiz, session);
+      });
+
+      // 检查已有 session 或创建新 session
+      Store.getQuizSession().then(function(session) {
+        if (session && session.quizId === quizId && session.phase !== 'done') {
+          // 已有活跃 session，onSessionChange 会处理渲染
+        } else {
+          createNewSession(quiz);
+        }
+      });
+    }).catch(function(err) {
+      console.error('加载测验失败:', err);
+      container.innerHTML = '<p style="text-align:center;color:var(--color-danger);padding:var(--space-lg)">加载失败</p>';
+    });
+  }
+
+  function createNewSession(quiz) {
+    var questions = quiz.questions || [];
+    var results = questions.map(function(q) {
+      return {
+        type: q.type || 'choice',
+        status: 'pending',
+        childAnswer: null,
+        isCorrect: null,
+        earned: 0
+      };
+    });
+    Store.setQuizSession({
+      quizId: _quizEngine.quiz.id,
+      phase: 'answering',
+      currentIndex: 0,
+      totalEarned: 0,
+      childConfirmed: false,
+      questionResults: results
+    });
+  }
+
+  function renderTimerBarHTML(pct) {
+    return '<div class="quiz-timer-bar"><div class="quiz-timer-bar__fill" id="quizTimerFill" style="width:' + pct + '%"></div></div>';
+  }
+
+  function startTimer(seconds, container, qIdx) {
+    _quizEngine.timerRemaining = seconds;
+    _quizEngine.timerTotal = seconds;
+    clearQuizTimer();
+    _quizEngine.timerHandle = setInterval(function() {
+      _quizEngine.timerRemaining--;
+      if (_quizEngine.timerRemaining <= 0) {
+        clearQuizTimer();
+        handleTimeout(qIdx);
+        return;
+      }
+      var pct = (_quizEngine.timerRemaining / _quizEngine.timerTotal) * 100;
+      var fill = document.getElementById('quizTimerFill');
+      if (fill) {
+        fill.style.width = pct + '%';
+        if (pct < 20) fill.classList.add('is-critical');
+      }
+    }, 1000);
+  }
+
+  function renderCurrentQuestion(container, quiz, session) {
+    var questions = quiz.questions || [];
+    var isRetry = (session.phase === 'retry');
+    var idx = session.currentIndex;
+    var q = questions[idx];
+    var result = session.questionResults[idx];
+    if (!q || !result) return;
+
+    // 判断是否已回答（区分首次答题和回访）
+    var isAnswered = isRetry
+      ? (result.retryStatus === 'retry-graded' || result.retryStatus === 'retry-submitted' || result.retryIsCorrect !== undefined)
+      : (result.status !== 'pending');
+
+    var qNum = isRetry ? '回访 ' + (idx + 1) : (idx + 1);
+
+    var html = '';
+    // 进度条（仅在答题阶段且非回访模式下有时间限制时显示）
+    if (!isRetry && q.timeLimit > 0 && !isAnswered) {
+      html += renderTimerBarHTML(100);
+    }
+    // 阶段标签
+    html += '<div class="blackboard-quiz__title">📝 ' + SharedUI.esc(quiz.title) + (isRetry ? ' — 错题回访' : '') + '</div>';
+
+    // 累计积分显示
+    var currentTotal = 0;
+    session.questionResults.forEach(function(r) { currentTotal += (r.earned || 0) + (r.retryEarned || 0); });
+    var quizTotal = quiz.totalPoints || 0;
+    html += '<div class="blackboard-quiz__score-hint">当前得分：' + currentTotal + ' / ' + quizTotal + ' 分</div>';
+
+    // 题目内容
+    html += '<div class="blackboard-quiz__question">';
+    html += '<div class="blackboard-quiz__qtext">' + qNum + '. ' + SharedUI.esc(q.question) + '</div>';
+
+    if (isAnswered) {
+      html += renderResultContent(q, result, isRetry);
+    } else {
+      html += renderAnswerInput(q, result, isRetry);
+    }
+    html += '</div>';
+    container.innerHTML = html;
+
+    // 启动计时器
+    if (!isRetry && q.timeLimit > 0 && !isAnswered) {
+      startTimer(q.timeLimit, container, idx);
+    }
+
+    // 绑定答题事件
+    if (!isAnswered) {
+      bindAnswerEvents(container, q, idx, session);
+    }
+
+    // 如果当前题已有最终结果（已批改/超时），自动前进
+    if (isAnswered) {
+      var isFinal = false;
+      if (result.status === 'timedout') {
+        isFinal = true;
+      } else if (isRetry) {
+        isFinal = (result.retryIsCorrect === true || result.retryIsCorrect === false);
+      } else {
+        // 选择题自动判分后已设置 isCorrect
+        // 填空/朗读被家长批改后设置 isCorrect
+        isFinal = (result.isCorrect === true || result.isCorrect === false);
+      }
+      if (isFinal) {
+        _quizEngine.advanceTimer = setTimeout(function() {
+          var latestResults = session.questionResults.slice();
+          var lt = 0;
+          latestResults.forEach(function(r) { lt += (r.earned || 0) + (r.retryEarned || 0); });
+          doAdvance(session, latestResults, lt);
+        }, 1200);
+      }
+    }
+  }
+
+  function renderAnswerInput(q, result, isRetry) {
+    var type = q.type || 'choice';
+    var html = '';
+    if (type === 'choice') {
+      var options = q.options || [];
+      html += '<div class="blackboard-quiz__options">';
+      for (var j = 0; j < options.length; j++) {
+        html += '<label class="blackboard-quiz__option" data-optidx="' + j + '">' +
+          '<input type="radio" name="quiz_answer" value="' + j + '">' +
+          '<span>' + SharedUI.esc(options[j]) + '</span>' +
+        '</label>';
+      }
+      html += '</div>';
+    } else if (type === 'fill') {
+      html += '<div class="blackboard-quiz__fill">' +
+        '<input type="text" class="blackboard-quiz__fill-input" id="quizFillInput" placeholder="输入答案..." maxlength="200">' +
+      '</div>';
+    } else if (type === 'read') {
+      html += '<div class="blackboard-quiz__read-hint">朗读以上内容，让家长评判</div>';
+      html += '<button class="btn btn--primary btn--sm" id="btnReadDone" style="margin-top:var(--space-md)">朗读完成</button>';
+    }
+    return html;
+  }
+
+  function bindAnswerEvents(container, q, qIdx, session) {
+    var type = q.type || 'choice';
+
+    if (type === 'choice') {
+      container.querySelectorAll('.blackboard-quiz__option').forEach(function(el) {
+        el.addEventListener('click', function() {
+          // 取消同组选中
+          container.querySelectorAll('.blackboard-quiz__option').forEach(function(opt) {
+            opt.classList.remove('is-selected');
+          });
+          this.classList.add('is-selected');
+          var radio = this.querySelector('input[type="radio"]');
+          if (radio) radio.checked = true;
+
+          // 自动提交（点击即答）
+          var answer = parseInt(this.dataset.optidx, 10);
+          submitChoiceAnswer(qIdx, answer, session);
+        });
+      });
+    } else if (type === 'fill') {
+      var input = document.getElementById('quizFillInput');
+      if (input) {
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            submitFillAnswer(qIdx, input.value.trim(), session);
+          }
+        });
+        // 提交按钮
+        var submitBtn = container.querySelector('.blackboard-quiz__fill-submit');
+        // 没有按钮，用回车提交，或者加一个
+      }
+      // 加一个提交按钮
+      var fillArea = container.querySelector('.blackboard-quiz__fill');
+      if (fillArea) {
+        var btn = document.createElement('button');
+        btn.className = 'btn btn--primary btn--sm';
+        btn.textContent = '提交';
+        btn.style.marginTop = 'var(--space-sm)';
+        btn.addEventListener('click', function() {
+          submitFillAnswer(qIdx, input.value.trim(), session);
+        });
+        fillArea.appendChild(btn);
+      }
+    } else if (type === 'read') {
+      var readBtn = container.querySelector('#btnReadDone');
+      if (readBtn) {
+        readBtn.addEventListener('click', function() {
+          submitReadAnswer(qIdx, session);
+        });
+      }
+    }
+  }
+
+  // ========== 朗读完成 ==========
+
+  function submitReadAnswer(qIdx, session) {
+    var results = session.questionResults.slice();
+    var isRetry = (session.phase === 'retry');
+    var update;
+    if (isRetry) {
+      update = {
+        retryStatus: 'retry-submitted',
+        retryChildAnswer: 'read'
+      };
+    } else {
+      update = {
+        status: 'submitted',
+        childAnswer: 'read'
+      };
+    }
+    results[qIdx] = Object.assign({}, results[qIdx], update);
+    var newTotal = 0;
+    results.forEach(function(r) { newTotal += (r.earned || 0) + (r.retryEarned || 0); });
+    Store.updateQuizSession({ questionResults: results, totalEarned: newTotal });
+  }
+
+  // ========== 提交处理 ==========
+
+  function submitChoiceAnswer(qIdx, answer, session) {
+    var q = _quizEngine.quiz.questions[qIdx];
+    var isRetry = (session.phase === 'retry');
+    var isCorrect;
+    var pts;
+
+    if (isRetry) {
+      isCorrect = (answer === q.correctIndex);
+      pts = isCorrect ? Math.floor((q.points !== undefined ? q.points : 5) / 2) : 0;
+    } else {
+      isCorrect = (answer === q.correctIndex);
+      pts = isCorrect ? (q.points !== undefined ? q.points : 5) : 0;
+    }
+
+    var results = session.questionResults.slice();
+    if (isRetry) {
+      results[qIdx] = Object.assign({}, results[qIdx], {
+        retryStatus: 'retry-graded',
+        retryChildAnswer: answer,
+        retryIsCorrect: isCorrect,
+        retryEarned: pts
+      });
+    } else {
+      results[qIdx] = Object.assign({}, results[qIdx], {
+        status: 'submitted',
+        childAnswer: answer,
+        isCorrect: isCorrect,
+        earned: pts
+      });
+    }
+
+    var newTotal = 0;
+    results.forEach(function(r) { newTotal += (r.earned || 0) + (r.retryEarned || 0); });
+
+    Store.updateQuizSession({ questionResults: results, totalEarned: newTotal });
+    doAdvance(session, results, newTotal);
+  }
+
+  function submitFillAnswer(qIdx, answer, session) {
+    if (!answer) { UI.toast('请输入答案', 'error'); return; }
+    var isRetry = (session.phase === 'retry');
+
+    var results = session.questionResults.slice();
+    if (isRetry) {
+      results[qIdx] = Object.assign({}, results[qIdx], {
+        retryStatus: 'retry-submitted',
+        retryChildAnswer: answer,
+        retryIsCorrect: null,
+        retryEarned: 0
+      });
+    } else {
+      results[qIdx] = Object.assign({}, results[qIdx], {
+        status: 'submitted',
+        childAnswer: answer,
+        isCorrect: null,
+        earned: 0
+      });
+    }
+
+    Store.updateQuizSession({ questionResults: results });
+    UI.toast('答案已提交，等待批改', 'info');
+  }
+
+  function handleTimeout(qIdx) {
+    var session = _quizEngine.session;
+    if (!session) return;
+    var results = session.questionResults.slice();
+    results[qIdx] = Object.assign({}, results[qIdx], {
+      status: 'timedout',
+      childAnswer: null,
+      isCorrect: false,
+      earned: 0
+    });
+    var newTotal = 0;
+    results.forEach(function(r) { newTotal += (r.earned || 0) + (r.retryEarned || 0); });
+    Store.updateQuizSession({ questionResults: results, totalEarned: newTotal });
+    // 超时后短暂等待，再自动前进
+    _quizEngine.advanceTimer = setTimeout(function() {
+      doAdvance(session, results, newTotal);
+    }, 800);
+  }
+
+  function doAdvance(session, results, newTotal) {
+    if (!newTotal) {
+      newTotal = 0;
+      results.forEach(function(r) { newTotal += (r.earned || 0) + (r.retryEarned || 0); });
+    }
+    var isRetry = (session.phase === 'retry');
+    var nextIdx;
+
+    if (isRetry) {
+      // 回访模式：按 retryQueue 顺序跳到下一道错题
+      var rq = session.retryQueue || [];
+      var curPos = rq.indexOf(session.currentIndex);
+      if (curPos >= 0 && curPos + 1 < rq.length) {
+        nextIdx = rq[curPos + 1];
+      } else {
+        nextIdx = results.length; // 所有回访题完成
+      }
+    } else {
+      nextIdx = session.currentIndex + 1;
+    }
+
+    // 检查当前题是否需要等家长批改（回访模式下）
+    if (isRetry && nextIdx < results.length) {
+      var curResult = results[session.currentIndex];
+      if (curResult && (curResult.type === 'fill' || curResult.type === 'read') && curResult.retryStatus === 'retry-submitted' && curResult.retryIsCorrect === null) {
+        return; // 等家长批完再跳
+      }
+    }
+
+    if (nextIdx < results.length) {
+      Store.updateQuizSession({
+        currentIndex: nextIdx,
+        totalEarned: newTotal,
+        questionResults: results
+      });
+    } else {
+      // 所有题目走完 → 检查是否还有题在等批改
+      var hasPendingGrade = false;
+      results.forEach(function(r) {
+        if ((r.type === 'fill' || r.type === 'read') && r.isCorrect === null) {
+          hasPendingGrade = true;
+        }
+        if (r.retryStatus === 'retry-submitted' && r.retryIsCorrect === null) {
+          hasPendingGrade = true;
+        }
+      });
+      if (hasPendingGrade) return; // 还有题目在等家长批改，等待
+
+      if (isRetry) {
+        // 回访结束 → 进入总结页
+        Store.updateQuizSession({
+          phase: 'summary',
+          totalEarned: newTotal,
+          questionResults: results
+        });
+        return;
+      }
+      var wrongIndices = [];
+      results.forEach(function(r, i) {
+        if (r.type !== 'read' && r.type !== 'fill') {
+          if (r.status === 'timedout' || r.isCorrect === false) wrongIndices.push(i);
+        } else {
+          // 填空/朗读：批改错误才算错
+          if (r.isCorrect === false) wrongIndices.push(i);
+        }
+      });
+      if (wrongIndices.length > 0) {
+        startRetryPhase(results, wrongIndices);
+      } else {
+        Store.updateQuizSession({
+          phase: 'summary',
+          totalEarned: newTotal,
+          questionResults: results
+        });
+      }
+    }
+  }
+
+  // ========== 错题回访 ==========
+
+  function startRetryPhase(results, wrongIndices) {
+    var retryQueue = wrongIndices.slice();
+    var firstRetryIdx = retryQueue[0];
+    var currentTotal = 0;
+    results.forEach(function(r) { currentTotal += (r.earned || 0); });
+    Store.updateQuizSession({
+      phase: 'retry',
+      currentIndex: firstRetryIdx,
+      retryQueue: retryQueue,
+      totalEarned: currentTotal,
+      questionResults: results
+    });
+  }
+
+  function isRetryQuestion(idx, session) {
+    var queue = session.retryQueue || [];
+    return queue.indexOf(idx) !== -1;
+  }
+
+  function getRetryResultIndex(session, originalIdx) {
+    return (session.retryQueue || []).indexOf(originalIdx);
+  }
+
+  // ========== 结果渲染 ==========
+
+  function renderResultContent(q, result, isRetry) {
+    var type = q.type || 'choice';
+    var html = '';
+    var esc = SharedUI.esc;
+
+    if (isRetry) {
+      // 回访模式：检查 retry 状态
+      if (type === 'fill' && result.retryStatus === 'retry-submitted' && result.retryIsCorrect === null) {
+        html += '<div class="blackboard-quiz__result is-pending">';
+        html += '<p>⏳ 你的答案：' + esc(result.retryChildAnswer) + '</p>';
+        html += '<p style="color:var(--color-text-muted)">等待家长批改中...</p>';
+        html += '</div>';
+        return html;
+      }
+      if (type === 'read' && result.retryIsCorrect === null) {
+        html += '<div class="blackboard-quiz__result is-pending">';
+        html += '<p>🎤 请家长评判（回访）</p>';
+        html += '</div>';
+        return html;
+      }
+    } else {
+      // 首次答题
+      if (type === 'fill' && result.status === 'submitted' && result.isCorrect === null) {
+        html += '<div class="blackboard-quiz__result is-pending">';
+        html += '<p>⏳ 你的答案：' + esc(result.childAnswer) + '</p>';
+        html += '<p style="color:var(--color-text-muted)">等待家长批改中...</p>';
+        html += '</div>';
+        return html;
+      }
+      if (type === 'read' && result.status === 'pending') {
+        html += '<div class="blackboard-quiz__result is-pending">';
+        html += '<p>🎤 请家长评判</p>';
+        html += '</div>';
+        return html;
+      }
+      if (type === 'read' && result.status === 'submitted' && result.isCorrect === null) {
+        html += '<div class="blackboard-quiz__result is-pending">';
+        html += '<p style="color:var(--color-text-muted)">已读完，等待家长评判...</p>';
+        html += '</div>';
+        return html;
+      }
+      if (result.status === 'timedout') {
+        html += '<div class="blackboard-quiz__result is-wrong"><p>⏰ 超时，该题不计分</p></div>';
+        return html;
+      }
+    }
+
+    var earned = 0;
+    var isCorrect = result.isCorrect;
+    if (isRetry) {
+      earned = result.retryEarned || 0;
+      isCorrect = result.retryIsCorrect;
+    } else {
+      earned = result.earned || 0;
+    }
+
+    if (isCorrect) {
+      html += '<div class="blackboard-quiz__result is-correct"><p>✅ 正确！+' + earned + '分</p></div>';
+      if (isRetry) {
+        html += '<div class="blackboard-quiz__score-sub">(回访 +' + earned + '分)</div>';
+      }
+    } else if (isCorrect === false) {
+      html += '<div class="blackboard-quiz__result is-wrong"><p>❌ 不正确</p></div>';
+      // 非回访时显示正确答案参考
+      if (!isRetry && type === 'choice' && q.options && q.correctIndex !== undefined) {
+        html += '<div class="blackboard-quiz__score-sub">正确答案：' + esc(q.options[q.correctIndex]) + '</div>';
+      }
+      if (!isRetry && type === 'fill' && q.acceptableAnswers) {
+        html += '<div class="blackboard-quiz__score-sub">参考答案：' + esc(q.acceptableAnswers.join('、')) + '</div>';
+      }
+    }
+
+    return html;
+  }
+
+  // ========== 汇总页 ==========
+
+  function renderSummary(container, quiz, session) {
+    var questions = quiz.questions || [];
+    var results = session.questionResults || [];
+    var totalQuestions = questions.length;
+    var correctCount = 0;
+    var totalEarned = 0;
+
+    results.forEach(function(r, i) {
+      var isCorrect = r.isCorrect === true;
+      var retryCorrect = r.retryIsCorrect === true;
+      if (isCorrect || retryCorrect) correctCount++;
+      totalEarned += (r.earned || 0);
+      if (r.retryEarned) totalEarned += r.retryEarned;
+    });
+
+    var allRetryDone = true;
+    results.forEach(function(r) {
+      if (r.isCorrect === false || r.status === 'timedout') {
+        // 需要回访的题
+        if (r.retryStatus !== 'graded' && r.retryStatus !== 'submitted') {
+          // 回访未完成
+          if (r.retryStatus !== 'retry-graded' && r.retryStatus !== 'retry-submitted') {
+            if (r.retryIsCorrect === undefined && r.retryEarned === undefined) {
+              allRetryDone = false;
+            }
+          }
+        }
+      }
+    });
+    // 更简单的判断：如果 phase 是 summary 且 retryQueue 还存在但所有题都已回访
+    // 直接用 session.phase === 'summary' 表示回访已完成
+
+    var html = '';
+    html += '<div class="blackboard-quiz__title">📝 ' + SharedUI.esc(quiz.title) + ' — 完成！</div>';
+
+    html += '<div class="blackboard-quiz__summary">';
+    html += '<div class="blackboard-quiz__score">答对 ' + correctCount + ' / ' + totalQuestions + ' 题</div>';
+    html += '<div class="blackboard-quiz__score-sub">共获得 ' + totalEarned + ' 分</div>';
+    html += '</div>';
+
+    // 逐题明细
+    html += '<div class="blackboard-quiz__summary-detail">';
+    for (var i = 0; i < questions.length; i++) {
+      var q = questions[i];
+      var r = results[i];
+      var icon = '';
+      var detail = '';
+      if (r.isCorrect === true) {
+        icon = '✅';
+        detail = '+' + (r.earned || 0) + '分';
+      } else if (r.retryIsCorrect === true) {
+        icon = '🔁✅';
+        detail = '+' + (r.retryEarned || 0) + '分(回访)';
+      } else if (r.status === 'timedout') {
+        icon = '⏰';
+        detail = '超时';
+      } else if (r.isCorrect === false) {
+        icon = '❌';
+        detail = '未答对';
+      } else if (r.retryIsCorrect === false) {
+        icon = '❌';
+        detail = '回访未过';
+      } else {
+        icon = '❓';
+        detail = '未完成';
+      }
+      html += '<div class="blackboard-quiz__summary-row">' +
+        '<span>' + icon + ' ' + SharedUI.esc(q.question) + '</span>' +
+        '<span class="blackboard-quiz__summary-pts">' + detail + '</span>' +
+      '</div>';
+    }
+    html += '</div>';
+
+    // 确认按钮
+    if (session.childConfirmed) {
+      html += '<div class="blackboard-quiz__confirm" style="text-align:center;padding:var(--space-md)">';
+      html += '<p style="color:var(--color-primary);font-weight:bold">✅ 已领取 ' + totalEarned + ' 分</p>';
+      html += '</div>';
+    } else {
+      html += '<div class="blackboard-quiz__confirm" style="text-align:center;padding:var(--space-md)">';
+      html += '<button class="btn btn--primary" id="btnConfirmClaim">确认领取 ' + totalEarned + ' 分</button>';
+      html += '</div>';
+    }
+
+    container.innerHTML = html;
+
+    // 绑确认事件
+    var btn = document.getElementById('btnConfirmClaim');
+    if (btn) {
+      btn.addEventListener('click', function() {
+        handleConfirmClaim(container, session);
+      });
+    }
+  }
+
+  function handleConfirmClaim(container, session) {
+    var totalEarned = 0;
+    (session.questionResults || []).forEach(function(r) {
+      totalEarned += (r.earned || 0);
+      if (r.retryEarned) totalEarned += r.retryEarned;
+    });
+
+    PointsManager.addAchievementPoints(totalEarned).then(function() {
+      UI.toast('获得 ' + totalEarned + ' 成果积分！', 'success');
+      // 写入兑换记录
+      Store.addExchangeLog({
+        type: 'quiz_reward',
+        points: totalEarned,
+        userId: window._uid,
+        description: _quizEngine.quiz ? _quizEngine.quiz.title : ''
+      });
+      // 更新显示已领取，然后关闭
+      Store.updateQuizSession({ childConfirmed: true });
+      setTimeout(function() {
+        cleanupQuizEngine();
+        Store.deleteQuizSession();
+        Store.setBlackboard({
+          contentType: null,
+          textContent: '',
+          resourceId: '',
+          resourceName: '',
+          resourceUrl: '',
+          resourceContentType: ''
+        });
+        var frame = document.querySelector('.blackboard-frame');
+        if (frame) {
+          var existing = document.getElementById('blackboardQuizContainer');
+          if (existing) existing.remove();
+        }
+        $blackboardEmpty.style.display = '';
+      }, 1500);
+    }).catch(function(err) {
+      console.error('领取积分失败:', err);
+      UI.toast('领取失败，请重试', 'error');
+    });
+  }
+
+  // ========== Session 变化驱动渲染（增强版）==========
+
+  function onQuizSessionChange(container, quiz, session) {
+    if (!session || session.phase === 'done' || session.phase === null) {
+      container.innerHTML = '<div class="blackboard-quiz__title">📝 测验</div><p style="text-align:center;color:var(--color-text-muted);padding:var(--space-lg)">等待中...</p>';
+      return;
+    }
+
+    _quizEngine.session = session;
+
+    clearQuizTimer();
+    if (_quizEngine.advanceTimer) { clearTimeout(_quizEngine.advanceTimer); _quizEngine.advanceTimer = null; }
+
+    if (session.phase === 'summary') {
+      renderSummary(container, quiz, session);
+    } else if (session.phase === 'answering' || session.phase === 'retry') {
+      renderCurrentQuestion(container, quiz, session);
+    }
+  }
+
 
   function fitBlackboardText() {
     const frame = document.querySelector('.blackboard-frame');

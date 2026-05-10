@@ -528,6 +528,7 @@ document.addEventListener('firebase:ready', async () => {
         '</label>';
       }
       html += '</div>';
+      html += '<div style="text-align:right;margin-top:var(--space-sm)"><button class="btn btn--primary btn--sm" id="btnChoiceSubmit">确认</button></div>';
     } else if (type === 'fill') {
       html += '<div class="blackboard-quiz__fill">' +
         '<input type="text" class="blackboard-quiz__fill-input" id="quizFillInput" placeholder="输入答案..." maxlength="200">' +
@@ -544,19 +545,23 @@ document.addEventListener('firebase:ready', async () => {
     if (type === 'choice') {
       container.querySelectorAll('.blackboard-quiz__option').forEach(function(el) {
         el.addEventListener('click', function() {
-          // 取消同组选中
           container.querySelectorAll('.blackboard-quiz__option').forEach(function(opt) {
             opt.classList.remove('is-selected');
           });
           this.classList.add('is-selected');
           var radio = this.querySelector('input[type="radio"]');
           if (radio) radio.checked = true;
-
-          // 自动提交（点击即答）
-          var answer = parseInt(this.dataset.optidx, 10);
-          submitChoiceAnswer(qIdx, answer, session);
         });
       });
+      var choiceSubmitBtn = container.querySelector('#btnChoiceSubmit');
+      if (choiceSubmitBtn) {
+        choiceSubmitBtn.addEventListener('click', function() {
+          var selected = container.querySelector('.blackboard-quiz__option.is-selected');
+          if (!selected) { UI.toast('请先选择一个答案', 'error'); return; }
+          var answer = parseInt(selected.dataset.optidx, 10);
+          submitChoiceAnswer(qIdx, answer, session);
+        });
+      }
     } else if (type === 'fill') {
       var input = document.getElementById('quizFillInput');
       if (input) {

@@ -925,15 +925,15 @@
 }
 
 .blackboard-quiz__options {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--space-xs);
 }
 
 .blackboard-quiz__option {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   padding: var(--space-xs) var(--space-sm);
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--color-border);
@@ -942,6 +942,8 @@
   transition: all var(--transition-fast);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
+  word-break: break-word;
+  min-width: 0;
 }
 .blackboard-quiz__option:hover {
   border-color: var(--color-accent);

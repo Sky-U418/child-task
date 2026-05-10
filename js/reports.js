@@ -90,6 +90,18 @@ const ReportManager = (() => {
     let pointsSpent = 0;
 
     for (const l of exchangeLogs) {
+      // 测验积分属于获得积分，不计入消耗
+      if (l.type === 'quiz_reward') {
+        const quizTitle = l.description || '小测验';
+        if (!taskByTitle['📝 ' + quizTitle]) {
+          taskByTitle['📝 ' + quizTitle] = { count: 0, totalPoints: 0 };
+        }
+        taskByTitle['📝 ' + quizTitle].count++;
+        const pts = (l.points || 0);
+        taskByTitle['📝 ' + quizTitle].totalPoints += pts;
+        pointsEarned += pts;
+        continue;
+      }
       if (!rewardByTitle[l.rewardTitle]) {
         rewardByTitle[l.rewardTitle] = { count: 0, totalCost: 0 };
       }

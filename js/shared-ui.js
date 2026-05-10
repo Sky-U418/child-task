@@ -138,6 +138,16 @@ const SharedUI = (() => {
       const d = l.exchangedAt.toDate();
       timeStr = `${d.getMonth() + 1}/${d.getDate()}`;
     }
+    // 测验积分：正向显示
+    if (l.type === 'quiz_reward') {
+      return `
+        <div class="log-item">
+          <span class="log-item__title">🎯 ${esc(l.description || '小测验')}</span>
+          <span class="log-item__cost" style="color:var(--color-success)">+${l.points || 0}</span>
+          <span class="log-item__time">${timeStr}</span>
+        </div>
+      `;
+    }
     return `
       <div class="log-item">
         <span class="log-item__title">${esc(l.rewardTitle)}</span>

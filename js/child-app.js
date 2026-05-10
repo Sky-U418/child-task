@@ -605,7 +605,8 @@ document.addEventListener('firebase:ready', async () => {
     if (isRetry) {
       update = {
         retryStatus: 'retry-submitted',
-        retryChildAnswer: 'read'
+        retryChildAnswer: 'read',
+        retryIsCorrect: null
       };
     } else {
       update = {

@@ -243,7 +243,7 @@ const SharedUI = (() => {
     if (appealStatus === 'pending') {
       rowClass += ' log-item--pending';
       actionHtml = `<span class="status-tag status-tag--pending">待审批</span>`;
-      const refundAmount = (l.baseSpent || 0) + (l.achievementSpent || 0);
+      const refundAmount = 'baseSpent' in l ? (l.baseSpent || 0) + (l.achievementSpent || 0) : (l.cost || 0);
       pendingActionsHtml = `<div class="pending-actions">
         <button class="btn-approve" data-action="approve" data-collection="exchangeLog" data-id="${l.id}">✓ 同意 退${refundAmount}分</button>
         <button class="btn-reject" data-action="reject" data-collection="exchangeLog" data-id="${l.id}">✗ 驳回</button>
@@ -282,7 +282,7 @@ const SharedUI = (() => {
     if (appealStatus === 'pending') {
       rowClass += ' log-item--pending';
       actionHtml = `<span class="status-tag status-tag--pending">待审批</span>`;
-      const refundAmount = (l.baseDeducted || 0) + (l.achievementDeducted || 0);
+      const refundAmount = 'baseDeducted' in l ? (l.baseDeducted || 0) + (l.achievementDeducted || 0) : (l.amount || 0);
       pendingActionsHtml = `<div class="pending-actions">
         <button class="btn-approve" data-action="approve" data-collection="deductionLog" data-id="${l.id}">✓ 同意 退${refundAmount}分</button>
         <button class="btn-reject" data-action="reject" data-collection="deductionLog" data-id="${l.id}">✗ 驳回</button>

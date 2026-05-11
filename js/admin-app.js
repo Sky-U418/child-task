@@ -1827,8 +1827,19 @@ document.addEventListener('firebase:ready', () => {
         const data = doc.data();
 
         // 返还积分
-        const baseAmt = data.baseSpent || data.baseDeducted || 0;
-        const achAmt = data.achievementSpent || data.achievementDeducted || 0;
+        let baseAmt, achAmt;
+        if (collection === 'exchangeLog') {
+          if ('baseSpent' in data) {
+            baseAmt = data.baseSpent || 0;
+            achAmt = data.achievementSpent || 0;
+          } else {
+            baseAmt = data.cost || 0;
+            achAmt = 0;
+          }
+        } else {
+          baseAmt = data.baseDeducted || 0;
+          achAmt = data.achievementDeducted || 0;
+        }
         await PointsManager.refundPoints(baseAmt, achAmt);
 
         // 返还兑换次数（仅 exchangeLog）

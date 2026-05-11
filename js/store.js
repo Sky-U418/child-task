@@ -186,6 +186,16 @@ const Store = (() => {
       .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }
 
+  function getExchangeLogs7d() {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return db.collection(C.COLL_EXCHANGE_LOG)
+      .where('exchangedAt', '>=', firebase.firestore.Timestamp.fromDate(d))
+      .orderBy('exchangedAt', 'desc')
+      .get()
+      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
+
   // ========== 扣分日志 ==========
 
   function addDeductionLog(data) {
@@ -202,6 +212,33 @@ const Store = (() => {
       .limit(200)
       .get()
       .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
+
+  function getDeductionLogs7d() {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return db.collection(C.COLL_DEDUCTION_LOG)
+      .where('deductedAt', '>=', firebase.firestore.Timestamp.fromDate(d))
+      .orderBy('deductedAt', 'desc')
+      .get()
+      .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
+
+  // ========== 申诉 ==========
+
+  function createAppeal(collection, docId) {
+    return db.collection(collection).doc(docId).update({
+      appealStatus: 'pending',
+      appealCreatedAt: firebase.firestore.Timestamp.now()
+    });
+  }
+
+  function updateExchangeLog(id, data) {
+    return db.collection(C.COLL_EXCHANGE_LOG).doc(id).update(data);
+  }
+
+  function updateDeductionLog(id, data) {
+    return db.collection(C.COLL_DEDUCTION_LOG).doc(id).update(data);
   }
 
   function getDeductionLogsByDateRange(uid, fromDateStr, toDateStr) {
@@ -412,14 +449,15 @@ const Store = (() => {
     getRewards, onRewardsChange, addReward, updateReward, deleteReward,
     getPointsConfig, onPointsConfigChange, updatePointsConfig, setPointsConfig,
     getStreak, onStreakChange, updateStreak, setStreak,
-    addExchangeLog, getExchangeLogs, getExchangeLogsByDateRange,
-    addDeductionLog, getDeductionLogs, getDeductionLogsByDateRange,
+    addExchangeLog, getExchangeLogs, getExchangeLogs7d, getExchangeLogsByDateRange,
+    addDeductionLog, getDeductionLogs, getDeductionLogs7d, getDeductionLogsByDateRange,
     addTaskLog, getTaskLogs,
     getResources, onResourcesChange, addResource, deleteResource,
     addQuiz, getQuizzes, getQuiz, deleteQuiz,
     getQuizSession, onQuizSessionChange, setQuizSession, updateQuizSession, deleteQuizSession,
     getBlackboard, onBlackboardChange, setBlackboard,
     getAppConfig, updateAppConfig, setAppConfig, onAppConfigChange,
-    runTransaction, batchWrite
+    runTransaction, batchWrite,
+    createAppeal, updateExchangeLog, updateDeductionLog
   };
 })();

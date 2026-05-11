@@ -141,12 +141,28 @@ const PointsManager = (() => {
     });
   }
 
+  /** 原路返还积分（撤销申诉时使用） */
+  async function refundPoints(baseAmount, achievementAmount) {
+    if (!baseAmount && !achievementAmount) return;
+    return Store.runTransaction(async transaction => {
+      const ref = db.collection(C.COLL_POINTS).doc('config');
+      const doc = await transaction.get(ref);
+      if (!doc.exists) throw new Error('积分配置不存在');
+      const config = doc.data();
+      transaction.update(ref, {
+        currentBasePoints: (config.currentBasePoints || 0) + (baseAmount || 0),
+        achievementPoints: (config.achievementPoints || 0) + (achievementAmount || 0)
+      });
+    });
+  }
+
   return {
     grantDailyBasePoints,
     getTotalPoints,
     addAchievementPoints,
     spendPoints,
     deductPoints,
-    resetAllPoints
+    resetAllPoints,
+    refundPoints
   };
 })();

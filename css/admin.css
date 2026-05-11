@@ -632,9 +632,10 @@
 }
 
 .log-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 48px 56px;
+  gap: var(--space-sm);
   align-items: center;
-  justify-content: space-between;
   padding: var(--space-sm) var(--space-md);
   background: rgba(255,255,255,0.02);
   border: 1px solid var(--color-border);
@@ -642,27 +643,122 @@
   font-size: var(--text-sm);
 }
 
+.log-item--deduction {
+  border-left: 3px solid var(--color-danger);
+}
+
+.log-item--pending {
+  background: #fef2f2;
+  border-bottom: 2px solid #fca5a5;
+}
+
+.log-item--withdrawable {
+  background: #fffbeb;
+}
+
+.log-item--appealing {
+  background: #fefce8;
+}
+
+.log-item--revoked {
+  opacity: 0.7;
+}
+
+.log-item--revoked .log-item__title,
+.log-item--revoked .log-item__cost {
+  text-decoration: line-through;
+  color: #999;
+}
+
 .log-item__title {
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-item__action {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 48px;
 }
 
 .log-item__cost {
   font-family: var(--font-display);
   font-size: var(--text-xs);
   color: var(--color-warning);
+  text-align: right;
 }
 
 .log-item__time {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+  text-align: right;
 }
 
-/* 扣分记录条目 */
-.log-item--deduction {
-  border-left: 3px solid var(--color-danger);
-}
 .log-item--deduction .log-item__cost {
   color: var(--color-danger);
+}
+
+.status-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.status-tag--pending {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+.status-tag--approved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-tag--rejected {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.pending-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.btn-approve {
+  padding: 4px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: #4ade80;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-approve:hover {
+  background: #22c55e;
+}
+
+.btn-reject {
+  padding: 4px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: #f87171;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-reject:hover {
+  background: #ef4444;
 }
 
 /* ----- 资源管理 ----- */

@@ -128,10 +128,6 @@ document.addEventListener('firebase:ready', () => {
   const $adminExchangeLogList = document.getElementById('adminExchangeLogList');
   const $adminLogHeader = document.getElementById('adminLogHeader');
   const $adminLogCollapseArrow = document.getElementById('adminLogCollapseArrow');
-  const $btnAdminClearLogs = document.getElementById('btnAdminClearLogs');
-  function _getLogHiddenBefore() {
-    return parseInt(localStorage.getItem('exchangeLogHiddenBefore') || '0', 10);
-  }
 
   let isFirstTime = false;
   let allTasks = [];
@@ -387,11 +383,6 @@ document.addEventListener('firebase:ready', () => {
       $adminLogCollapseArrow.classList.toggle('is-collapsed');
     });
 
-    $btnAdminClearLogs.addEventListener('click', () => {
-      localStorage.setItem('exchangeLogHiddenBefore', Date.now().toString());
-      loadAdminExchangeLogs();
-      UI.toast('显示已清空', 'info');
-    });
 
     // 黑板状态监听
     Store.onBlackboardChange(function(data) {
@@ -1037,38 +1028,26 @@ document.addEventListener('firebase:ready', () => {
   async function loadAdminExchangeLogs() {
     try {
       const [exchangeLogs, deductionLogs] = await Promise.all([
-        Store.getExchangeLogs(),
-        Store.getDeductionLogs()
+        Store.getExchangeLogs7d(),
+        Store.getDeductionLogs7d()
       ]);
 
-      const hiddenBefore = _getLogHiddenBefore();
-
-      const visibleExchanges = hiddenBefore
-        ? exchangeLogs.filter(l => l.exchangedAt.toDate().getTime() > hiddenBefore)
-        : exchangeLogs;
-
-      const visibleDeductions = hiddenBefore
-        ? deductionLogs.filter(l => l.deductedAt.toDate().getTime() > hiddenBefore)
-        : deductionLogs;
-
-      // 合并并按时间倒序
+      const now = Date.now();
       const allLogs = [
-        ...visibleExchanges.map(l => ({ ...l, _type: 'exchange', _time: l.exchangedAt.toDate().getTime() })),
-        ...visibleDeductions.map(l => ({ ...l, _type: 'deduction', _time: l.deductedAt.toDate().getTime() }))
+        ...exchangeLogs.map(l => ({ ...l, _type: 'exchange', _time: l.exchangedAt.toDate().getTime() })),
+        ...deductionLogs.map(l => ({ ...l, _type: 'deduction', _time: l.deductedAt.toDate().getTime() }))
       ].sort((a, b) => b._time - a._time);
 
       if (allLogs.length === 0) {
         $adminExchangeLogList.innerHTML = '<p style="color:var(--color-text-muted);text-align:center;padding:var(--space-lg)">暂无记录</p>';
-        $btnAdminClearLogs.style.display = 'none';
         return;
       }
 
-      $btnAdminClearLogs.style.display = '';
       $adminExchangeLogList.innerHTML = allLogs.map(l => {
         if (l._type === 'deduction') {
-          return SharedUI.renderDeductionLogItem(l);
+          return SharedUI.renderAdminDeductionLogItem(l, now);
         }
-        return SharedUI.renderExchangeLogItem(l);
+        return SharedUI.renderAdminExchangeLogItem(l, now);
       }).join('');
     } catch (err) { /* 静默 */ }
   }
@@ -1829,4 +1808,81 @@ document.addEventListener('firebase:ready', () => {
     const d = new Date(dateStr + 'T23:59:59');
     return firebase.firestore.Timestamp.fromDate(d);
   }
+
+  // ========== 申诉审批 ==========
+
+  $adminExchangeLogList.addEventListener('click', async (e) => {
+    // 同意
+    const approveBtn = e.target.closest('[data-action="approve"]');
+    if (approveBtn) {
+      const collection = approveBtn.dataset.collection;
+      const docId = approveBtn.dataset.id;
+      const ok = await UI.confirm('确认同意', '同意后将原路返还积分，确定吗？');
+      if (!ok) return;
+
+      try {
+        // 读取原始记录
+        const doc = await db.collection(collection).doc(docId).get();
+        if (!doc.exists) { UI.toast('记录不存在', 'error'); return; }
+        const data = doc.data();
+
+        // 返还积分
+        const baseAmt = data.baseSpent || data.baseDeducted || 0;
+        const achAmt = data.achievementSpent || data.achievementDeducted || 0;
+        await PointsManager.refundPoints(baseAmt, achAmt);
+
+        // 返还兑换次数（仅 exchangeLog）
+        if (collection === 'exchangeLog' && data.rewardId) {
+          await RewardManager.restoreExchangeCount(data.rewardId);
+        }
+
+        // 更新申诉状态
+        if (collection === 'exchangeLog') {
+          await Store.updateExchangeLog(docId, {
+            appealStatus: 'approved',
+            appealResolvedAt: firebase.firestore.Timestamp.now()
+          });
+        } else {
+          await Store.updateDeductionLog(docId, {
+            appealStatus: 'approved',
+            appealResolvedAt: firebase.firestore.Timestamp.now()
+          });
+        }
+
+        UI.toast('已同意，积分已返还', 'success');
+        loadAdminExchangeLogs();
+      } catch (err) {
+        UI.toast('操作失败: ' + err.message, 'error');
+      }
+      return;
+    }
+
+    // 驳回
+    const rejectBtn = e.target.closest('[data-action="reject"]');
+    if (rejectBtn) {
+      const collection = rejectBtn.dataset.collection;
+      const docId = rejectBtn.dataset.id;
+      const ok = await UI.confirm('确认驳回', '确定要驳回该申诉吗？');
+      if (!ok) return;
+
+      try {
+        if (collection === 'exchangeLog') {
+          await Store.updateExchangeLog(docId, {
+            appealStatus: 'rejected',
+            appealResolvedAt: firebase.firestore.Timestamp.now()
+          });
+        } else {
+          await Store.updateDeductionLog(docId, {
+            appealStatus: 'rejected',
+            appealResolvedAt: firebase.firestore.Timestamp.now()
+          });
+        }
+        UI.toast('已驳回', 'info');
+        loadAdminExchangeLogs();
+      } catch (err) {
+        UI.toast('操作失败: ' + err.message, 'error');
+      }
+      return;
+    }
+  });
 });

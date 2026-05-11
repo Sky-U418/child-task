@@ -85,6 +85,8 @@ const RewardManager = (() => {
         rewardId: rewardId,
         rewardTitle: reward.title,
         cost: reward.cost,
+        baseSpent: baseSpend,
+        achievementSpent: achievementSpend,
         exchangedAt: firebase.firestore.Timestamp.now()
       });
 
@@ -141,6 +143,21 @@ const RewardManager = (() => {
     return Store.updateReward(rewardId, { isActive });
   }
 
+  /** 还原兑换次数 */
+  async function restoreExchangeCount(rewardId) {
+    return Store.runTransaction(async transaction => {
+      const rewardRef = db.collection(C.COLL_REWARDS).doc(rewardId);
+      const rewardDoc = await transaction.get(rewardRef);
+      if (!rewardDoc.exists) return;
+      const reward = rewardDoc.data();
+      if ((reward.exchangedCount || 0) > 0) {
+        transaction.update(rewardRef, {
+          exchangedCount: reward.exchangedCount - 1
+        });
+      }
+    });
+  }
+
   /** 删除奖励 */
   async function removeReward(rewardId) {
     return Store.deleteReward(rewardId);
@@ -190,7 +207,7 @@ const RewardManager = (() => {
 
   return {
     isExchangeable, exchangeReward,
-    createReward, resetLimitedReward, toggleRewardActive, removeReward,
+    createReward, resetLimitedReward, toggleRewardActive, restoreExchangeCount, removeReward,
     checkPeriodicReset
   };
 })();

@@ -132,46 +132,176 @@ const SharedUI = (() => {
   }
 
   /** 渲染单条兑换日志 HTML */
-  function renderExchangeLogItem(l) {
+  function renderExchangeLogItem(l, now) {
     let timeStr = '';
     if (l.exchangedAt) {
       const d = l.exchangedAt.toDate();
       timeStr = `${d.getMonth() + 1}/${d.getDate()}`;
     }
-    // 测验积分：正向显示
+    // Quiz reward — simple display, no appeal
     if (l.type === 'quiz_reward') {
-      return `
-        <div class="log-item">
-          <span class="log-item__title">🎯 ${esc(l.description || '小测验')}</span>
-          <span class="log-item__cost" style="color:var(--color-success)">+${l.points || 0}</span>
-          <span class="log-item__time">${timeStr}</span>
-        </div>
-      `;
-    }
-    return `
-      <div class="log-item">
-        <span class="log-item__title">${esc(l.rewardTitle)}</span>
-        <span class="log-item__cost">-${l.cost}</span>
+      return `<div class="log-item">
+        <span class="log-item__title">🎯 ${esc(l.description || '小测验')}</span>
+        <span class="log-item__action"></span>
+        <span class="log-item__cost" style="color:var(--color-success)">+${l.points || 0}</span>
         <span class="log-item__time">${timeStr}</span>
-      </div>
-    `;
+      </div>`;
+    }
+
+    const appealStatus = l.appealStatus;
+    let rowClass = 'log-item';
+    let titleClass = 'log-item__title';
+    let costClass = 'log-item__cost';
+    let actionHtml = '';
+
+    if (appealStatus === 'pending') {
+      rowClass += ' log-item--appealing';
+      actionHtml = `<span class="status-tag status-tag--pending">申诉中</span>`;
+    } else if (appealStatus === 'approved') {
+      rowClass += ' log-item--revoked';
+      actionHtml = `<span class="status-tag status-tag--approved">已撤销</span>`;
+    } else if (appealStatus === 'rejected') {
+      actionHtml = `<span class="status-tag status-tag--rejected">已驳回</span>`;
+    } else {
+      // Check 24h window
+      if (l.exchangedAt && (now - l.exchangedAt.toDate().getTime()) < 86400000) {
+        rowClass += ' log-item--withdrawable';
+        actionHtml = `<button class="btn-withdraw" data-action="withdraw" data-collection="exchangeLog" data-id="${l.id}">撤回</button>`;
+      }
+    }
+
+    return `<div class="${rowClass}">
+      <span class="${titleClass}">${esc(l.rewardTitle)}</span>
+      <span class="log-item__action">${actionHtml}</span>
+      <span class="${costClass}">-${l.cost}</span>
+      <span class="log-item__time">${timeStr}</span>
+    </div>`;
   }
 
   /** 渲染单条扣分日志 HTML */
-  function renderDeductionLogItem(l) {
+  function renderDeductionLogItem(l, now) {
     let timeStr = '';
     if (l.deductedAt) {
       const d = l.deductedAt.toDate();
       timeStr = `${d.getMonth() + 1}/${d.getDate()}`;
     }
-    return `
-      <div class="log-item log-item--deduction">
-        <span class="log-item__title">${esc(l.reason)}</span>
-        <span class="log-item__cost">-${l.amount}</span>
-        <span class="log-item__time">${timeStr}</span>
-      </div>
-    `;
+
+    const appealStatus = l.appealStatus;
+    let rowClass = 'log-item log-item--deduction';
+    let titleClass = 'log-item__title';
+    let costClass = 'log-item__cost';
+    let actionHtml = '';
+
+    if (appealStatus === 'pending') {
+      rowClass += ' log-item--appealing';
+      actionHtml = `<span class="status-tag status-tag--pending">申诉中</span>`;
+    } else if (appealStatus === 'approved') {
+      rowClass += ' log-item--revoked';
+      actionHtml = `<span class="status-tag status-tag--approved">已撤销</span>`;
+    } else if (appealStatus === 'rejected') {
+      actionHtml = `<span class="status-tag status-tag--rejected">已驳回</span>`;
+    } else {
+      if (l.deductedAt && (now - l.deductedAt.toDate().getTime()) < 86400000) {
+        rowClass += ' log-item--withdrawable';
+        actionHtml = `<button class="btn-withdraw" data-action="withdraw" data-collection="deductionLog" data-id="${l.id}">撤回</button>`;
+      }
+    }
+
+    return `<div class="${rowClass}">
+      <span class="${titleClass}">⚠ ${esc(l.reason)}</span>
+      <span class="log-item__action">${actionHtml}</span>
+      <span class="${costClass}">-${l.amount}</span>
+      <span class="log-item__time">${timeStr}</span>
+    </div>`;
   }
 
-  return { esc, renderReportCard, renderReportDetailBody, renderExchangeLogItem, renderDeductionLogItem };
+  /** 管理端 — 待审批行包含底部操作按钮 */
+  function renderAdminExchangeLogItem(l, now) {
+    let timeStr = '';
+    if (l.exchangedAt) {
+      const d = l.exchangedAt.toDate();
+      timeStr = `${d.getMonth() + 1}/${d.getDate()}`;
+    }
+
+    // Quiz reward display (no appeal on admin side)
+    if (l.type === 'quiz_reward') {
+      return `<div class="log-item">
+        <span class="log-item__title">🎯 ${esc(l.description || '小测验')}</span>
+        <span class="log-item__action"></span>
+        <span class="log-item__cost" style="color:var(--color-success)">+${l.points || 0}</span>
+        <span class="log-item__time">${timeStr}</span>
+      </div>`;
+    }
+
+    const appealStatus = l.appealStatus;
+    let rowClass = 'log-item';
+    let titleClass = 'log-item__title';
+    let costClass = 'log-item__cost';
+    let actionHtml = '';
+    let pendingActionsHtml = '';
+
+    if (appealStatus === 'pending') {
+      rowClass += ' log-item--pending';
+      actionHtml = `<span class="status-tag status-tag--pending">待审批</span>`;
+      const refundAmount = (l.baseSpent || 0) + (l.achievementSpent || 0);
+      pendingActionsHtml = `<div class="pending-actions">
+        <button class="btn-approve" data-action="approve" data-collection="exchangeLog" data-id="${l.id}">✓ 同意 退${refundAmount}分</button>
+        <button class="btn-reject" data-action="reject" data-collection="exchangeLog" data-id="${l.id}">✗ 驳回</button>
+      </div>`;
+    } else if (appealStatus === 'approved') {
+      rowClass += ' log-item--revoked';
+      actionHtml = `<span class="status-tag status-tag--approved">已撤销</span>`;
+    } else if (appealStatus === 'rejected') {
+      actionHtml = `<span class="status-tag status-tag--rejected">已驳回</span>`;
+    }
+
+    return `<div class="${rowClass}">
+      <span class="${titleClass}">${esc(l.rewardTitle)}</span>
+      <span class="log-item__action">${actionHtml}</span>
+      <span class="${costClass}">-${l.cost}</span>
+      <span class="log-item__time">${timeStr}</span>
+      ${pendingActionsHtml}
+    </div>`;
+  }
+
+  /** 管理端 — 扣分日志待审批行包含底部操作按钮 */
+  function renderAdminDeductionLogItem(l, now) {
+    let timeStr = '';
+    if (l.deductedAt) {
+      const d = l.deductedAt.toDate();
+      timeStr = `${d.getMonth() + 1}/${d.getDate()}`;
+    }
+
+    const appealStatus = l.appealStatus;
+    let rowClass = 'log-item log-item--deduction';
+    let titleClass = 'log-item__title';
+    let costClass = 'log-item__cost';
+    let actionHtml = '';
+    let pendingActionsHtml = '';
+
+    if (appealStatus === 'pending') {
+      rowClass += ' log-item--pending';
+      actionHtml = `<span class="status-tag status-tag--pending">待审批</span>`;
+      const refundAmount = (l.baseDeducted || 0) + (l.achievementDeducted || 0);
+      pendingActionsHtml = `<div class="pending-actions">
+        <button class="btn-approve" data-action="approve" data-collection="deductionLog" data-id="${l.id}">✓ 同意 退${refundAmount}分</button>
+        <button class="btn-reject" data-action="reject" data-collection="deductionLog" data-id="${l.id}">✗ 驳回</button>
+      </div>`;
+    } else if (appealStatus === 'approved') {
+      rowClass += ' log-item--revoked';
+      actionHtml = `<span class="status-tag status-tag--approved">已撤销</span>`;
+    } else if (appealStatus === 'rejected') {
+      actionHtml = `<span class="status-tag status-tag--rejected">已驳回</span>`;
+    }
+
+    return `<div class="${rowClass}">
+      <span class="${titleClass}">⚠ ${esc(l.reason)}</span>
+      <span class="log-item__action">${actionHtml}</span>
+      <span class="${costClass}">-${l.amount}</span>
+      <span class="log-item__time">${timeStr}</span>
+      ${pendingActionsHtml}
+    </div>`;
+  }
+
+  return { esc, renderReportCard, renderReportDetailBody, renderExchangeLogItem, renderDeductionLogItem, renderAdminExchangeLogItem, renderAdminDeductionLogItem };
 })();

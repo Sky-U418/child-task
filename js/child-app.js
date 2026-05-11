@@ -49,7 +49,6 @@ document.addEventListener('firebase:ready', async () => {
   const $exchangeLogList = document.getElementById('exchangeLogList');
   const $exchangeLogHeader = document.getElementById('exchangeLogHeader');
   const $logCollapseArrow = document.getElementById('logCollapseArrow');
-  const $btnClearLogs = document.getElementById('btnClearLogs');
 
   // Blackboard
   const $blackboardEmpty = document.getElementById('blackboardEmpty');
@@ -67,9 +66,6 @@ document.addEventListener('firebase:ready', async () => {
   const $blackboardExtLinkName = document.getElementById('blackboardExtLinkName');
   const $blackboardExtLinkBtn = document.getElementById('blackboardExtLinkBtn');
 
-  function _getLogHiddenBefore() {
-    return parseInt(localStorage.getItem('exchangeLogHiddenBefore') || '0', 10);
-  }
 
   // State
   let tasks = [];
@@ -130,12 +126,6 @@ document.addEventListener('firebase:ready', async () => {
     $logCollapseArrow.classList.toggle('is-collapsed');
   });
 
-  // 清空显示（记录时间戳，不删后台数据）
-  $btnClearLogs.addEventListener('click', () => {
-    localStorage.setItem('exchangeLogHiddenBefore', Date.now().toString());
-    loadExchangeLogs();
-    UI.toast('显示已清空', 'info');
-  });
 
   // ========== Tab 导航 ==========
 
@@ -1421,41 +1411,50 @@ document.addEventListener('firebase:ready', async () => {
   async function loadExchangeLogs() {
     try {
       const [exchangeLogs, deductionLogs] = await Promise.all([
-        Store.getExchangeLogs(),
-        Store.getDeductionLogs()
+        Store.getExchangeLogs7d(),
+        Store.getDeductionLogs7d()
       ]);
 
-      const hiddenBefore = _getLogHiddenBefore();
-
-      const visibleExchanges = hiddenBefore
-        ? exchangeLogs.filter(l => l.exchangedAt.toDate().getTime() > hiddenBefore)
-        : exchangeLogs;
-
-      const visibleDeductions = hiddenBefore
-        ? deductionLogs.filter(l => l.deductedAt.toDate().getTime() > hiddenBefore)
-        : deductionLogs;
-
+      const now = Date.now();
       const allLogs = [
-        ...visibleExchanges.map(l => ({ ...l, _type: 'exchange', _time: l.exchangedAt.toDate().getTime() })),
-        ...visibleDeductions.map(l => ({ ...l, _type: 'deduction', _time: l.deductedAt.toDate().getTime() }))
+        ...exchangeLogs.map(l => ({ ...l, _type: 'exchange', _time: l.exchangedAt.toDate().getTime() })),
+        ...deductionLogs.map(l => ({ ...l, _type: 'deduction', _time: l.deductedAt.toDate().getTime() }))
       ].sort((a, b) => b._time - a._time);
 
       if (allLogs.length === 0) {
         $exchangeLogList.innerHTML = '<p style="color:var(--color-text-muted);text-align:center;padding:var(--space-lg)">暂无记录</p>';
-        $btnClearLogs.style.display = 'none';
         return;
       }
 
-      $btnClearLogs.style.display = '';
       $exchangeLogList.innerHTML = allLogs.map(l => {
         if (l._type === 'deduction') {
-          return SharedUI.renderDeductionLogItem(l);
+          return SharedUI.renderDeductionLogItem(l, now);
         }
-        return SharedUI.renderExchangeLogItem(l);
+        return SharedUI.renderExchangeLogItem(l, now);
       }).join('');
     } catch (err) {
       // 静默失败
     }
   }
+
+  // 撤回按钮事件委托
+  $exchangeLogList.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action="withdraw"]');
+    if (!btn) return;
+
+    const collection = btn.dataset.collection;
+    const docId = btn.dataset.id;
+
+    const ok = await UI.confirm('撤回申请', '确定要撤回这条记录吗？家长审批后将返还积分。');
+    if (!ok) return;
+
+    try {
+      await Store.createAppeal(collection, docId);
+      UI.toast('撤回申请已提交，等待家长审批', 'info');
+      loadExchangeLogs();
+    } catch (err) {
+      UI.toast('提交失败: ' + err.message, 'error');
+    }
+  });
 
 });

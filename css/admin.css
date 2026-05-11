@@ -654,6 +654,10 @@
   border-bottom: 2px solid #fca5a5;
 }
 
+.log-item--pending .log-item__title {
+  color: #000;
+}
+
 .log-item--withdrawable {
   /* 仅标识可撤回，配色与正常记录一致 */
 }

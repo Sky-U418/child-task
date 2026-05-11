@@ -835,7 +835,7 @@
 
 .status-tag--pending {
   background: #fef3c7;
-  color: #92400e;
+  color: #000;
 }
 
 .status-tag--approved {

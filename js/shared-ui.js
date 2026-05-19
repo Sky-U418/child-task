@@ -25,8 +25,36 @@ const SharedUI = (() => {
       title = `${startDate.getMonth() + 1}月`; cardClass = 'report-card--monthly';
     }
 
-    const _sv = (stat, color) =>
-      `<div class="report-card__stat-value" style="color:${color}" data-report-key="${reportKey}" data-stat="${stat}">${r[stat]}</div>`;
+    // 所有统计项定义
+    const allStats = [
+      { key: 'checkInDays', label: '打卡天数', color: 'var(--color-warning)' },
+      { key: 'maxStreakInPeriod', label: '最长连续', color: 'var(--color-warning)' },
+      { key: 'tasksCompleted', label: '完成任务', color: 'var(--color-success)' },
+      { key: 'pointsEarned', label: '获得积分', color: 'var(--color-success)' },
+      { key: 'rewardsExchanged', label: '兑换奖励', color: 'var(--color-accent)' },
+      { key: 'pointsSpent', label: '消耗积分', color: 'var(--color-accent)' },
+    ];
+
+    // 周报去掉"兑换奖励"，月报保留全部
+    const isWeekly = type === 'lastWeek' || type === 'thisWeek';
+    const stats = isWeekly ? allStats.filter(s => s.key !== 'rewardsExchanged') : allStats;
+
+    // 5 项布局时改用 flexbox，让第二行两项通过 justify-content: center 居中
+    const isFiveItemLayout = stats.length === 5;
+
+    const _buildStatItem = (s, flexStyle) => `<div class="report-card__stat"${flexStyle}>
+      <div class="report-card__stat-value" style="color:${s.color}" data-report-key="${reportKey}" data-stat="${s.key}">${r[s.key]}</div>
+      <div class="report-card__stat-label">${s.label}</div>
+    </div>`;
+
+    const innerStyle = isFiveItemLayout
+      ? ' style="display:flex;flex-wrap:wrap;justify-content:center;gap:var(--space-xs);margin-top:var(--space-xs)"'
+      : '';
+    const itemStyle = isFiveItemLayout
+      ? ' style="flex:0 0 calc((100% - 2 * var(--space-xs)) / 3);text-align:center;box-sizing:border-box"'
+      : '';
+
+    const statHtml = stats.map(s => _buildStatItem(s, itemStyle)).join('');
 
     return `
       <div class="report-card ${cardClass}">
@@ -34,31 +62,8 @@ const SharedUI = (() => {
           <span class="report-card__title">${title}</span>
           <span class="report-card__date">${dateStr}</span>
         </div>
-        <div class="report-card__stats">
-          <div class="report-card__stat">
-            ${_sv('checkInDays', 'var(--color-warning)')}
-            <div class="report-card__stat-label">打卡天数</div>
-          </div>
-          <div class="report-card__stat">
-            ${_sv('maxStreakInPeriod', 'var(--color-warning)')}
-            <div class="report-card__stat-label">最长连续</div>
-          </div>
-          <div class="report-card__stat">
-            ${_sv('tasksCompleted', 'var(--color-success)')}
-            <div class="report-card__stat-label">完成任务</div>
-          </div>
-          <div class="report-card__stat">
-            ${_sv('pointsEarned', 'var(--color-success)')}
-            <div class="report-card__stat-label">获得积分</div>
-          </div>
-          <div class="report-card__stat">
-            ${_sv('rewardsExchanged', 'var(--color-accent)')}
-            <div class="report-card__stat-label">兑换奖励</div>
-          </div>
-          <div class="report-card__stat">
-            ${_sv('pointsSpent', 'var(--color-accent)')}
-            <div class="report-card__stat-label">消耗积分</div>
-          </div>
+        <div class="report-card__stats"${innerStyle}>
+          ${statHtml}
         </div>
       </div>
     `;
